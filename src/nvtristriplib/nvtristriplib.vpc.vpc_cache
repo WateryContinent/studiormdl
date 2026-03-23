@@ -1,0 +1,12 @@
+"vpc_cache"
+{
+	"win32"
+	{
+		"CRCFile"		"nvtristriplib.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"nvtristriplib.vcxproj"
+			"1"		"nvtristriplib.vcxproj.filters"
+		}
+	}
+}

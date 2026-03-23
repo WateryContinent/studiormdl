@@ -1,0 +1,12 @@
+"vpc_cache"
+{
+	"win32"
+	{
+		"CRCFile"		"mathlib_extended.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"mathlib_extended.vcxproj"
+			"1"		"mathlib_extended.vcxproj.filters"
+		}
+	}
+}

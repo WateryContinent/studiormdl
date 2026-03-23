@@ -1,0 +1,39 @@
+﻿  A subdirectory or file ..\lib\public\. already exists.
+  AppSystemGroup.cpp
+  debug_lib_check.cpp
+  filesystem_init.cpp
+  matsysapp.cpp
+  VguiMatSysApp.cpp
+  WinApp.cpp
+C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(180,2): warning C5205: delete of an abstract class 'ICvar::ICVarIteratorInternal' that has a non-virtual destructor results in undefined behavior
+  (compiling source file 'VguiMatSysApp.cpp')
+      C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(157,8):
+      see declaration of 'ICvar::ICVarIteratorInternal'
+  
+C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(180,2): warning C5205: delete of an abstract class 'ICvar::ICVarIteratorInternal' that has a non-virtual destructor results in undefined behavior
+  (compiling source file 'matsysapp.cpp')
+      C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(157,8):
+      see declaration of 'ICvar::ICVarIteratorInternal'
+  
+C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(180,2): warning C5205: delete of an abstract class 'ICvar::ICVarIteratorInternal' that has a non-virtual destructor results in undefined behavior
+  (compiling source file 'WinApp.cpp')
+      C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(157,8):
+      see declaration of 'ICvar::ICVarIteratorInternal'
+  
+C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(180,2): warning C5205: delete of an abstract class 'ICvar::ICVarIteratorInternal' that has a non-virtual destructor results in undefined behavior
+  (compiling source file 'AppSystemGroup.cpp')
+      C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(157,8):
+      see declaration of 'ICvar::ICVarIteratorInternal'
+  
+C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\appframework\AppSystemGroup.cpp(592,16): warning C4456: declaration of 'pSystem' hides previous local declaration
+      C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\appframework\AppSystemGroup.cpp(575,15):
+      see declaration of 'pSystem'
+  
+C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(180,2): warning C5205: delete of an abstract class 'ICvar::ICVarIteratorInternal' that has a non-virtual destructor results in undefined behavior
+  (compiling source file '../public/filesystem_init.cpp')
+      C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\public\icvar.h(157,8):
+      see declaration of 'ICvar::ICVarIteratorInternal'
+  
+  'p4.exe' is not recognized as an internal or external command,
+  operable program or batch file.
+  appframework.vcxproj -> C:\Users\Benny\Desktop\R5R\tools\studiormdl\reference\lib\public\appframework.lib

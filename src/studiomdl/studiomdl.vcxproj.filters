@@ -1,0 +1,211 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{922C6F41-C460-59B1-3A59-D4FA6DDC9C37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Link Libraries">
+      <UniqueIdentifier>{6D11200E-4206-7C82-1DCE-61EA5E3FE718}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public Header Files">
+      <UniqueIdentifier>{BDBAD8B6-F777-0C5E-367D-3CE1B8CD9ADE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{9A3C0498-7C60-1BDF-BDF7-06BDDE4E468F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="VPC Scripts">
+      <UniqueIdentifier>{308191AE-A754-30DF-D5BD-5928E19D585F}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\lib\public\appframework.lib" />
+    <Library Include="..\lib\public\bonesetup.lib" />
+    <Library Include="..\lib\public\datamodel.lib" />
+    <Library Include="..\lib\public\dmeutils.lib" />
+    <Library Include="..\lib\public\dmserializers.lib" />
+    <Library Include="..\lib\public\fbxutils.lib" />
+    <Library Include="..\lib\public\interfaces.lib" />
+    <Library Include="..\lib\public\mathlib.lib" />
+    <Library Include="..\lib\public\mathlib_extended.lib" />
+    <Library Include="..\lib\public\mdlobjects.lib" />
+    <Library Include="..\lib\public\meshutils.lib" />
+    <Library Include="..\lib\public\movieobjects.lib" />
+    <Library Include="..\lib\public\nvtristrip.lib" />
+    <Library Include="..\lib\public\resourcefile.lib" />
+    <Library Include="..\lib\public\tier0.lib" />
+    <Library Include="..\lib\public\tier1.lib" />
+    <Library Include="..\lib\public\tier2.lib" />
+    <Library Include="..\lib\public\tier3.lib" />
+    <Library Include="..\lib\public\vstdlib.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="collisionmodel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="collisionmodelsource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compileclothproxy.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="filebuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hardwarematrixstate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hardwarevertexcache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nvtristriplib\nvtristrip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="optimize_subd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="perfstats.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="physics2collision.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="studiomdl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils_common\cmdlib.h" />
+    <ClInclude Include="..\utils_common\datalinker.h" />
+    <ClInclude Include="..\utils_common\filesystem_tools.h" />
+    <ClInclude Include="..\utils_common\physdll.h" />
+    <ClInclude Include="..\utils_common\scriplib.h" />
+    <ClInclude Include="..\public\alignedarray.h" />
+    <ClInclude Include="..\public\basehandle.h" />
+    <ClInclude Include="..\public\tier0\basetypes.h" />
+    <ClInclude Include="..\public\bitvec.h" />
+    <ClInclude Include="..\public\bone_accessor.h" />
+    <ClInclude Include="..\public\bone_setup.h" />
+    <ClInclude Include="..\public\bspflags.h" />
+    <ClInclude Include="..\public\tier1\byteswap.h" />
+    <ClInclude Include="..\public\tier1\characterset.h" />
+    <ClInclude Include="..\public\cmodel.h" />
+    <ClInclude Include="..\public\collisionutils.h" />
+    <ClInclude Include="..\public\mathlib\compressed_vector.h" />
+    <ClInclude Include="..\public\const.h" />
+    <ClInclude Include="..\public\vphysics\constraints.h" />
+    <ClInclude Include="..\public\tier0\dbg.h" />
+    <ClInclude Include="..\public\tier0\fasttimer.h" />
+    <ClInclude Include="..\public\filesystem.h" />
+    <ClInclude Include="..\public\filesystem_helpers.h" />
+    <ClInclude Include="..\public\gametrace.h" />
+    <ClInclude Include="..\public\appframework\iappsystem.h" />
+    <ClInclude Include="..\public\tier0\icommandline.h" />
+    <ClInclude Include="..\public\ihandleentity.h" />
+    <ClInclude Include="..\public\materialsystem\imaterial.h" />
+    <ClInclude Include="..\public\materialsystem\imaterialsystem.h" />
+    <ClInclude Include="..\public\materialsystem\imaterialvar.h" />
+    <ClInclude Include="..\public\tier1\interface.h" />
+    <ClInclude Include="..\public\istudiorender.h" />
+    <ClInclude Include="..\public\tier1\keyvalues.h" />
+    <ClInclude Include="..\public\materialsystem\materialsystem_config.h" />
+    <ClInclude Include="..\public\mathlib\mathlib.h" />
+    <ClInclude Include="..\public\tier0\memdbgoff.h" />
+    <ClInclude Include="..\public\tier0\memdbgon.h" />
+    <ClInclude Include="..\public\optimize.h" />
+    <ClInclude Include="..\public\phyfile.h" />
+    <ClInclude Include="..\public\phzfile.h" />
+    <ClInclude Include="..\public\tier0\platform.h" />
+    <ClInclude Include="..\public\vstdlib\random.h" />
+    <ClInclude Include="..\public\string_t.h" />
+    <ClInclude Include="..\public\tier1\strtools.h" />
+    <ClInclude Include="..\public\studio.h" />
+    <ClInclude Include="..\common\studiobyteswap.h" />
+    <ClInclude Include="..\public\tier3\tier3.h" />
+    <ClInclude Include="..\public\tier1\utlbuffer.h" />
+    <ClInclude Include="..\public\tier1\utldict.h" />
+    <ClInclude Include="..\public\tier1\utllinkedlist.h" />
+    <ClInclude Include="..\public\tier1\utlmemory.h" />
+    <ClInclude Include="..\public\tier1\utlrbtree.h" />
+    <ClInclude Include="..\public\tier1\utlsymbol.h" />
+    <ClInclude Include="..\public\tier1\utlvector.h" />
+    <ClInclude Include="..\public\vcollide.h" />
+    <ClInclude Include="..\public\vcollide_parse.h" />
+    <ClInclude Include="..\public\mathlib\vector.h" />
+    <ClInclude Include="..\public\mathlib\vector2d.h" />
+    <ClInclude Include="..\public\mathlib\vector4d.h" />
+    <ClInclude Include="..\public\mathlib\vmatrix.h" />
+    <ClInclude Include="..\public\vphysics_interface.h" />
+    <ClInclude Include="..\public\mathlib\vplane.h" />
+    <ClInclude Include="..\public\tier0\vprof.h" />
+    <ClInclude Include="..\public\vstdlib\vstdlib.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="collisionmodel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="collisionmodelsource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compileclothproxy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dmxsupport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hardwarematrixstate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hardwarevertexcache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mrmsupport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="objsupport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="optimize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="optimize_subd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="perfstats.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="simplify.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="studiomdl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UnifyLODs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="v1support.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="write.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\utils_common\cmdlib.cpp" />
+    <ClCompile Include="..\public\collisionutils.cpp" />
+    <ClCompile Include="..\utils_common\datalinker.cpp" />
+    <ClCompile Include="..\public\filesystem_helpers.cpp" />
+    <ClCompile Include="..\public\filesystem_init.cpp" />
+    <ClCompile Include="..\utils_common\filesystem_tools.cpp" />
+    <ClCompile Include="..\public\interpolatortypes.cpp" />
+    <ClCompile Include="..\public\mdlobjects\mdlobjects.cpp" />
+    <ClCompile Include="..\public\tier0\memoverride.cpp" />
+    <ClCompile Include="..\public\movieobjects\movieobjects_compiletools.cpp" />
+    <ClCompile Include="..\utils_common\physdll.cpp" />
+    <ClCompile Include="..\utils_common\scriplib.cpp" />
+    <ClCompile Include="..\public\studio.cpp" />
+    <ClCompile Include="..\common\studiobyteswap.cpp" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <None Include="studiomdl.vpc">
+      <Filter>VPC Scripts</Filter>
+    </None>
+  </ItemGroup>
+</Project>

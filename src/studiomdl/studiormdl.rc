@@ -1,0 +1,4 @@
+// studiormdl.rc
+#include <windows.h>
+
+IDI_APPICON ICON "studiormdl.ico"

@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectName>materialsystem</ProjectName>
+    <ProjectGuid>{B1C2D3E4-F5A6-7890-BCDE-F01234567890}</ProjectGuid>
+    <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <TargetName>materialsystem</TargetName>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <TargetName>materialsystem</TargetName>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)build\materialsystem\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)build\materialsystem\Debug\int\</IntDir>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.dll</TargetExt>
+    <PreBuildEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreBuildEventUseInBuild>
+    <PreLinkEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreLinkEventUseInBuild>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</GenerateManifest>
+    <PostBuildEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PostBuildEventUseInBuild>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)build\materialsystem\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)build\materialsystem\Release\int\</IntDir>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.dll</TargetExt>
+    <PreBuildEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</PreBuildEventUseInBuild>
+    <PreLinkEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</PreLinkEventUseInBuild>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</GenerateManifest>
+    <PostBuildEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</PostBuildEventUseInBuild>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <PreBuildEvent>
+      <Command>echo PreBuildEvent disabled</Command>
+    </PreBuildEvent>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\public;$(SolutionDir)src\public\materialsystem;$(SolutionDir)src\common;$(SolutionDir)src\materialsystem;$(SolutionDir)src\public\tier0;$(SolutionDir)src\public\tier1;$(SolutionDir)src\public\tier2;$(SolutionDir)src\public\bitmap;$(SolutionDir)src\public\vtf;$(SolutionDir)src\utils_common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WIN32;_DEBUG;_WINDOWS;_USRDLL;MATERIALSYSTEM_EXPORTS;DEFINE_MATERIALSYSTEM_INTERFACE;PROTECTED_THINGS_ENABLE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_ALLOW_RUNTIME_LIBRARY_MISMATCH;_ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH;_ALLOW_MSC_VER_MISMATCH;COMPILER_MSVC32;COMPILER_MSVC;_DLL_EXT=.dll;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <MinimalRebuild>false</MinimalRebuild>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AssemblerListingLocation>$(IntDir)/</AssemblerListingLocation>
+      <ObjectFileName>$(IntDir)/</ObjectFileName>
+      <ProgramDataBaseFileName>$(IntDir)/</ProgramDataBaseFileName>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <CompileAs>CompileAsCpp</CompileAs>
+      <DisableSpecificWarnings>4061;4062;4091;4097;4100;4121;4127;4191;4201;4239;4242;4244;4250;4254;4255;4263;4264;4265;4266;4296;4302;4311;4316;4324;4350;4351;4355;4365;4371;4388;4435;4464;4471;4481;4505;4511;4512;4514;4530;4544;4547;4548;4571;4574;4577;4587;4611;4619;4623;4625;4626;4628;4640;4647;4668;4702;4710;4711;4738;4748;4774;4777;4786;4820;4826;4868;4883;4917;4928;4946;4986;4987;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Culture>1033</Culture>
+    </ResourceCompile>
+    <PreLinkEvent>
+      <Command>echo PreLinkEvent disabled</Command>
+    </PreLinkEvent>
+    <Link>
+      <AdditionalOptions>/ignore:4221</AdditionalOptions>
+      <AdditionalDependencies>tier0.lib;tier1.lib;tier2.lib;tier3.lib;vstdlib.lib;interfaces.lib;mathlib.lib;winmm.lib;Ws2_32.lib;imm32.lib;oleaut32.lib;shell32.lib;user32.lib;advapi32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ShowProgress>NotSet</ShowProgress>
+      <OutputFile>$(OutDir)\materialsystem.dll</OutputFile>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <AdditionalLibraryDirectories>$(SolutionDir)src\lib\public</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libc;libcd;libcmt</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(IntDir)/$(TargetName).pdb</ProgramDatabaseFile>
+      <SubSystem>Windows</SubSystem>
+      <ImportLibrary>$(SolutionDir)src\lib\public\materialsystem.lib</ImportLibrary>
+      <TargetMachine>MachineX86</TargetMachine>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+    </Link>
+    <Manifest>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+    </Manifest>
+    <PostBuildEvent><Command>echo PostBuildEvent disabled</Command></PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <PreBuildEvent>
+      <Command>echo PreBuildEvent disabled</Command>
+    </PreBuildEvent>
+    <ClCompile>
+      <AdditionalOptions>/MP /d2Zi+</AdditionalOptions>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\public;$(SolutionDir)src\public\materialsystem;$(SolutionDir)src\common;$(SolutionDir)src\materialsystem;$(SolutionDir)src\public\tier0;$(SolutionDir)src\public\tier1;$(SolutionDir)src\public\tier2;$(SolutionDir)src\public\bitmap;$(SolutionDir)src\public\vtf;$(SolutionDir)src\utils_common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_USRDLL;MATERIALSYSTEM_EXPORTS;DEFINE_MATERIALSYSTEM_INTERFACE;PROTECTED_THINGS_ENABLE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_ALLOW_RUNTIME_LIBRARY_MISMATCH;_ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH;_ALLOW_MSC_VER_MISMATCH;COMPILER_MSVC32;COMPILER_MSVC;_DLL_EXT=.dll;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AssemblerListingLocation>$(IntDir)/</AssemblerListingLocation>
+      <ObjectFileName>$(IntDir)/</ObjectFileName>
+      <ProgramDataBaseFileName>$(IntDir)/</ProgramDataBaseFileName>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <CompileAs>CompileAsCpp</CompileAs>
+      <DisableSpecificWarnings>4061;4062;4091;4097;4100;4121;4127;4191;4201;4239;4242;4244;4250;4254;4255;4263;4264;4265;4266;4296;4302;4311;4316;4324;4350;4351;4355;4365;4371;4388;4435;4464;4471;4481;4505;4511;4512;4514;4530;4544;4547;4548;4571;4574;4577;4587;4611;4619;4623;4625;4626;4628;4640;4647;4668;4702;4710;4711;4738;4748;4774;4777;4786;4820;4826;4868;4883;4917;4928;4946;4986;4987;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Culture>1033</Culture>
+    </ResourceCompile>
+    <PreLinkEvent>
+      <Command>echo PreLinkEvent disabled</Command>
+    </PreLinkEvent>
+    <Link>
+      <AdditionalOptions>/ignore:4221</AdditionalOptions>
+      <AdditionalDependencies>tier0.lib;tier1.lib;tier2.lib;tier3.lib;vstdlib.lib;interfaces.lib;mathlib.lib;winmm.lib;Ws2_32.lib;imm32.lib;oleaut32.lib;shell32.lib;user32.lib;advapi32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ShowProgress>NotSet</ShowProgress>
+      <OutputFile>$(OutDir)\materialsystem.dll</OutputFile>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <AdditionalLibraryDirectories>$(SolutionDir)src\lib\public</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>libc;libcd;libcmtd</IgnoreSpecificDefaultLibraries>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(IntDir)/$(TargetName).pdb</ProgramDatabaseFile>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <ImportLibrary>$(SolutionDir)src\lib\public\materialsystem.lib</ImportLibrary>
+      <TargetMachine>MachineX86</TargetMachine>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+    </Link>
+    <Manifest>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+    </Manifest>
+    <PostBuildEvent><Command>echo PostBuildEvent disabled</Command></PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="pch_materialsystem.cpp" />
+    <!-- Main source files -->
+    <ClCompile Include="CColorCorrection.cpp" />
+    <ClCompile Include="cmaterial.cpp" />
+    <ClCompile Include="cmaterial_queuefriendly.cpp" />
+    <ClCompile Include="CMaterialSubRect.cpp" />
+    <ClCompile Include="cmaterialvar.cpp" />
+    <ClCompile Include="cmatnullrendercontext.cpp" />
+    <ClCompile Include="colorspace.cpp" />
+    <ClCompile Include="ctexture.cpp" />
+    <ClCompile Include="$(SolutionDir)src\public\filesystem_helpers.cpp" />
+    <ClCompile Include="imagepacker.cpp" />
+    <ClCompile Include="mat_stub.cpp" />
+    <ClCompile Include="materialsystem_global.cpp" />
+    <ClCompile Include="morph.cpp" />
+    <ClCompile Include="SubdMgr.cpp" />
+    <ClCompile Include="occlusionquerymgr.cpp" />
+    <ClCompile Include="shadersystem.cpp" />
+    <ClCompile Include="texturemanager.cpp" />
+    <ClCompile Include="composite_texture.cpp" />
+    <ClCompile Include="custom_material.cpp" />
+    <ClCompile Include="base_visuals_data_processor.cpp" />
+    <ClCompile Include="cmaterialdict.cpp" />
+    <ClCompile Include="cmaterialsystem.cpp" />
+    <ClCompile Include="cmatlightmaps.cpp" />
+    <ClCompile Include="cmatpaintmaps.cpp" />
+    <ClCompile Include="cmatrendercontext.cpp" />
+    <ClCompile Include="cmatqueuedrendercontext.cpp" />
+    <!-- bitmap static lib sources compiled directly into this project -->
+    <ClCompile Include="$(SolutionDir)src\bitmap\bitmap.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\colorconversion.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\floatbitmap.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\floatbitmap2.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\floatbitmap3.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\floatbitmap4.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\floatbitmap_bilateralfilter.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\floatcubemap.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\imageformat.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\psd.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\psheet.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\resample.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\tgaloader.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\texturepacker.cpp" />
+    <ClCompile Include="$(SolutionDir)src\bitmap\tgawriter.cpp" />
+    <!-- vtf static lib sources -->
+    <ClCompile Include="$(SolutionDir)src\vtf\s3tc_decode.cpp" />
+    <ClCompile Include="$(SolutionDir)src\vtf\vtf.cpp" />
+    <!-- shaderlib sources -->
+    <ClCompile Include="shaderlib\BaseShader.cpp" />
+    <ClCompile Include="shaderlib\ShaderDLL.cpp" />
+    <ClCompile Include="shaderlib\shaderlib_cvar.cpp" />
+    <!-- raytrace sources (needed by floatbitmap4) -->
+    <ClCompile Include="$(SolutionDir)src\raytrace\raytrace.cpp" />
+    <ClCompile Include="$(SolutionDir)src\raytrace\trace2.cpp" />
+    <!-- stubs for unavailable third-party libs -->
+    <ClCompile Include="stubs.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch_materialsystem.h" />
+    <ClInclude Include="cmaterial_queuefriendly.h" />
+    <ClInclude Include="cmaterialdict.h" />
+    <ClInclude Include="cmaterialsystem.h" />
+    <ClInclude Include="cmatlightmaps.h" />
+    <ClInclude Include="cmatnullrendercontext.h" />
+    <ClInclude Include="cmatpaintmaps.h" />
+    <ClInclude Include="cmatqueuedrendercontext.h" />
+    <ClInclude Include="cmatrendercontext.h" />
+    <ClInclude Include="colorspace.h" />
+    <ClInclude Include="IHardwareConfigInternal.h" />
+    <ClInclude Include="imagepacker.h" />
+    <ClInclude Include="imaterialinternal.h" />
+    <ClInclude Include="imaterialsysteminternal.h" />
+    <ClInclude Include="imatrendercontextinternal.h" />
+    <ClInclude Include="imorphinternal.h" />
+    <ClInclude Include="isubdinternal.h" />
+    <ClInclude Include="itextureinternal.h" />
+    <ClInclude Include="materialsystem_global.h" />
+    <ClInclude Include="occlusionquerymgr.h" />
+    <ClInclude Include="shader_dll_verify.h" />
+    <ClInclude Include="shadersystem.h" />
+    <ClInclude Include="texturemanager.h" />
+    <ClInclude Include="composite_texture.h" />
+    <ClInclude Include="custom_material.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

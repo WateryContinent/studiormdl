@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"fbxutils.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"fbxutils.vcxproj"
+			"1"		"fbxutils.vcxproj.filters"
+		}
+	}
+}
