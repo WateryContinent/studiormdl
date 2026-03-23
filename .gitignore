@@ -1,1 +1,5 @@
 /.vs
+/bin
+/build
+/src/lib/public
+src/lib/public/appframework.lib
