@@ -1,2 +1,3 @@
-# studiormdl
-Model Compiler for Apex Legend (RMDL v54 subversion 10)
+<div align="center">
+   <img width="217" height="217" src="/assets/studiologo.png" alt="Logo">
+</div>
