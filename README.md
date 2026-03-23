@@ -11,8 +11,10 @@
 
 ## Features
 - **RUI Meshes:** Allows for RUI Meshes to be compiled into models
-- **Complete Compilation:** Compiles straight to RMDL
+- **Complete Compilation:** Compiles straight to RMDL, VG and PHY (if applicable)
 - **Animation Conversion:** **StudioRMDL** can convert animations from the SMD into rseq and rig
+- **VMT/SKNP TEXTURES** **StudioRMDL** can null the texture slots so it falls back to the old valve VMT system
+- **RUI DUMPING** Included **Python** script that can dump RUI Meshes from RMDL's for use
 
 ## Usage
 todo
