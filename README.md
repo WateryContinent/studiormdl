@@ -24,3 +24,30 @@ StudioRMDL wouldn't be possible without these people and their work:
 - **[rmdlconv](https://github.com/r-ex/rmdlconv) by rexx** – model conversion tool for Source & Respawn MDL formats (used for RMDL export logic)
 - **[R5-AnimConv](https://github.com/someoneatemylastsliceofpizza/R5-AnimConv) by someoneatemylastsliceofpizza** – animation converter for mdl animations to rseq/rrig, referenced for animation conversion.  
 - **[Resource Templates](https://github.com/IJARika/resource_model_templates) by Rika** – templates for models, animations, and rigs
+
+<div align="center">
+  <h3><b>My Other Projects</b></h3>
+</div>
+<div align="center">
+
+<table>
+<tr>
+
+<td align="center" width="170">
+  <a href="https://github.com/WateryContinent/rmdledit">
+    <img src="/assets/editlogo.png" width="80" height="80"><br>
+    <b>RMDLEdit</b><br>
+  </a>
+</td>
+
+<td align="center" width="170">
+  <a href="https://github.com/WateryContinent/bonejig">
+    <img src="/assets/jiglogo.png" width="80" height="80"><br>
+    <b>BoneJig</b><br>
+  </a>
+</td>
+
+</tr>
+</table>
+
+</div>
