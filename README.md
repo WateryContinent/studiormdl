@@ -55,6 +55,25 @@ $renamematerial "mc_mtl_p7_zm_vending_pap_leather" "models\zombies\vending_pap_l
 $renamematerial "mc_mtl_p7_zm_vending_pap_roller" "models\zombies\vending_pap_roller_rgdp" 
 ```
 
+### Dumping RUI Meshes
+Using the `rmdl_dump_rui.py` on a existing RMDL with an RUI mesh on it, like the ptpov_97 or ptpov_vinson, you can get the .rui out of it
+```
+rmdl_dump_rui.py ptpov_97.rmdl ptpov_97.rui
+```
+
+### Command Line Args
+There are a few command line args that change the output of StudioRMDL, notably
+- `-vmtext` - sets all the texture slots to 0x0 so they use VMTs instead of Apex Materials
+- `-convertanims` converts the mdl/smd anims to `rseq` and `rrig`, you need to use it with -sp (sequence path) and -rp (rig path) as shown below as an example
+```
+studiormdl.exe my_model.qc -convertanims -rp animrig/<usage of model>/<model name> -sp animseq/<usage of model>/<model name> 
+```
+R99 as an example
+```
+studiormdl.exe ptpov_97.qc -convertanims -rp animrig/weapons/r97 -sp animseq/weapons/r97 
+```
+
+
 ## Credits
 StudioRMDL wouldn't be possible without these people and their work:
 - **[rmdlconv](https://github.com/r-ex/rmdlconv) by rexx** – model conversion tool for Source & Respawn MDL formats (used for RMDL export logic)
