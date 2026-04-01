@@ -21,6 +21,8 @@
 #include "optimize.h"
 #include "mathlib/mathlib.h"
 #include "tier0/icommandline.h"
+#include "vphysics_interface.h"
+#include "mathlib/polyhedron.h"
 
 // R5-AnimConv integration — produces .rrig/.rseq alongside the .rmdl
 #include "animconv_wrapper.h"
@@ -35,7 +37,7 @@
 // Read directly from the global array instead of parsing the MDL binary to
 // avoid issues with the studiomdl string-table patching order.
 extern int    numcdtextures;
-extern char*  cdtextures[16];
+extern char* cdtextures[16];
 extern char   g_outname[MAX_PATH]; // e.g. "weapons\smr\w_smr.mdl"
 
 // Game content root — declared in utils_common/filesystem_tools.cpp.
@@ -657,20 +659,20 @@ struct r5_mstudiomodel_t
 
 struct r5_stringentry_t
 {
-    char*       base;
-    char*       addr;
-    int*        ptr;
+    char* base;
+    char* addr;
+    int* ptr;
     std::string string; // owning copy — prevents dangling when caller's std::string dies
     int         dupindex; // -1 if unique
 };
 
 static std::vector<r5_stringentry_t> s_stringTable;
-static char* s_pBase  = nullptr;
-static char* s_pData  = nullptr;
+static char* s_pBase = nullptr;
+static char* s_pData = nullptr;
 static r5_studiohdr_t* s_pHdr = nullptr;
-static bool s_bZeroGuids    = false; // set by -vmtext flag
+static bool s_bZeroGuids = false; // set by -vmtext flag
 static bool s_bConvertAnims = false; // set by -convertanims flag
-static bool s_bCdPick       = false; // set by -cdpick flag — interactive per-texture cdmaterials picker
+static bool s_bCdPick = false; // set by -cdpick flag — interactive per-texture cdmaterials picker
 static std::string s_overrideRrigPath;  // set by -rp
 static std::string s_overrideRseqPath;  // set by -sp
 static std::string s_ruiMeshFilePath;   // set by $ruimeshfile QC command
@@ -696,9 +698,9 @@ static void R5_AddToStringTable(char* base, int* ptr, const char* string)
     {
         if (it.string == string)
         {
-            entry.base     = base;
-            entry.ptr      = ptr;
-            entry.string   = string;
+            entry.base = base;
+            entry.ptr = ptr;
+            entry.string = string;
             entry.dupindex = i;
             s_stringTable.push_back(entry);
             return;
@@ -706,9 +708,9 @@ static void R5_AddToStringTable(char* base, int* ptr, const char* string)
         i++;
     }
 
-    entry.base     = base;
-    entry.ptr      = ptr;
-    entry.string   = string;
+    entry.base = base;
+    entry.ptr = ptr;
+    entry.string = string;
     entry.dupindex = -1;
     s_stringTable.push_back(entry);
 }
@@ -744,7 +746,7 @@ static char* R5_WriteStringTable(char* pData)
 static inline void R5_AlignData(char*& p, int align = 4)
 {
     intptr_t addr = (intptr_t)p;
-    intptr_t pad  = (align - (addr % align)) % align;
+    intptr_t pad = (align - (addr % align)) % align;
     memset(p, 0, pad);
     p += pad;
 }
@@ -767,7 +769,7 @@ static uint64_t R5_HashString(const char* pData)
         ++v1;
         v3 += 4;
         v2 = ((((uint64_t)(0xFB8C4D96501ull * v6) >> 24) + 0x633D5F1ull * v2) >> 61)
-           ^ (((uint64_t)(0xFB8C4D96501ull * v6) >> 24) + 0x633D5F1ull * v2);
+            ^ (((uint64_t)(0xFB8C4D96501ull * v6) >> 24) + 0x633D5F1ull * v2);
         v4 = (v7 - 45 * ((~(v7 ^ 0x5C5C5C5Cu) >> 7) & (((v7 ^ 0x5C5C5C5Cu) - 0x1010101u) >> 7) & 0x1010101u)) & 0xDFDFDFDFu;
     }
 
@@ -803,7 +805,7 @@ static uint32_t R5_PackNormalTangent(const Vector& normal, const Vector4D& tange
     int idx2 = (0x124u >> (2 * idx1 + 2)) & 3;
     int idx3 = (0x124u >> (2 * idx1 + 4)) & 3;
 
-    float s    = 255.0f / absNml[idx1];
+    float s = 255.0f / absNml[idx1];
     float val2 = (normal[idx2] * s) + 256.0f;
     float val3 = (normal[idx3] * s) + 256.0f;
 
@@ -832,15 +834,15 @@ static uint32_t R5_PackNormalTangent(const Vector& normal, const Vector4D& tange
         angle += 2.0f * M_PI * 2.0f; // += 2*pi (360 degrees)
     angle /= 0.00614192151f;
 
-    bool sign      = (normal[idx1] < 0.0f);
+    bool sign = (normal[idx1] < 0.0f);
     uint8_t binormSign = (tangent.w < 1.0f) ? 1u : 0u;
 
     return ((uint32_t)binormSign << 31)
-         | ((uint32_t)idx1 << 29)
-         | ((uint32_t)(sign ? 1 : 0) << 28)
-         | ((uint32_t)(unsigned short)(int)val2 << 19)
-         | ((uint32_t)(unsigned short)(int)val3 << 10)
-         | ((uint32_t)(unsigned short)(int)angle & 0x3FFu);
+        | ((uint32_t)idx1 << 29)
+        | ((uint32_t)(sign ? 1 : 0) << 28)
+        | ((uint32_t)(unsigned short)(int)val2 << 19)
+        | ((uint32_t)(unsigned short)(int)val3 << 10)
+        | ((uint32_t)(unsigned short)(int)angle & 0x3FFu);
 }
 
 //=============================================================================
@@ -1018,7 +1020,7 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
     b.hdr.boneStateChangeCount = (int64_t)b.boneStates.size();
     b.hdr.lodCount = pVTX->numLODs;
 
-    b.hdr.id      = VG_FILE_MAGIC;
+    b.hdr.id = VG_FILE_MAGIC;
     b.hdr.version = VG_FILE_VERSION;
 
     b.currentVertBufferSize = 0;
@@ -1061,14 +1063,14 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                     r5_vg_MeshHeader_t newMesh{};
                     newMesh.stripOffset = (int32_t)b.strips.size();
                     newMesh.indexOffset = (int32_t)b.indices.size();
-                    newMesh.vertOffset  = (uint32_t)b.currentVertBufferSize;
-                    newMesh.flags       = b.defaultFlags;
+                    newMesh.vertOffset = (uint32_t)b.currentVertBufferSize;
+                    newMesh.flags = b.defaultFlags;
 
                     // Bone weight flags
                     if (pHdr->numbones > 1)
                     {
                         newMesh.extraBoneWeightOffset = 0; // no extra weights for v49
-                        newMesh.legacyWeightOffset    = (int32_t)b.legacyWeights.size();
+                        newMesh.legacyWeightOffset = (int32_t)b.legacyWeights.size();
                         newMesh.flags |= VG_VERTEX_HAS_WEIGHT_BONES;
                         newMesh.flags |= VG_VERTEX_HAS_WEIGHT_VALUES_2;
                     }
@@ -1087,11 +1089,11 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                     {
                         const OptimizedModel::StripGroupHeader_t* pVtxSG = pVtxMesh->pStripGroup(sgIdx);
 
-                        newMesh.vertCount  += pVtxSG->numVerts;
+                        newMesh.vertCount += pVtxSG->numVerts;
                         newMesh.indexCount += pVtxSG->numIndices;
 
                         hwStrip.numIndices += pVtxSG->numIndices;
-                        hwStrip.numVerts   += pVtxSG->numVerts;
+                        hwStrip.numVerts += pVtxSG->numVerts;
                         if (pVtxSG->numStrips > 0)
                             hwStrip.numBones += pVtxSG->pStrip(0)->numBones;
 
@@ -1112,11 +1114,11 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                             const Vector4D* pTangent = lodTangents[vvdIdx];
 
                             r5_VGVertex_t hwVert{};
-                            hwVert.meshIndex   = globalMeshIndex;
-                            hwVert.pos         = pVVDVert->m_vecPosition;
+                            hwVert.meshIndex = globalMeshIndex;
+                            hwVert.pos = pVVDVert->m_vecPosition;
                             hwVert.posPacked.Set(pVVDVert->m_vecPosition);
                             hwVert.normalTangent = R5_PackNormalTangent(pVVDVert->m_vecNormal, *pTangent);
-                            hwVert.texcoord    = pVVDVert->m_vecTexCoord;
+                            hwVert.texcoord = pVVDVert->m_vecTexCoord;
 
                             if (newMesh.flags & VG_VERTEX_HAS_WEIGHT_BONES)
                             {
@@ -1279,7 +1281,7 @@ static void R5_WriteVGFile(const char* path, r5_VGBuilder& b)
 
     // Extra bone weights (none for v49 - no VVW)
     b.hdr.extraBoneWeightOffset = (int64_t)ftell(f);
-    b.hdr.extraBoneWeightSize   = 0;
+    b.hdr.extraBoneWeightSize = 0;
 
     // Unknown per-mesh data (0x30 bytes each, all zeros)
     size_t unkCount = (size_t)b.hdr.unknownCount;
@@ -1330,7 +1332,7 @@ static void R5_ConvertBones(const studiohdr_t* pOld)
     for (int i = 0; i < numBones; i++)
     {
         const mstudiobone_t* pOldBone = pOld->pBone(i);
-        r5_mstudiobone_t*    pNewBone = reinterpret_cast<r5_mstudiobone_t*>(s_pData) + i;
+        r5_mstudiobone_t* pNewBone = reinterpret_cast<r5_mstudiobone_t*>(s_pData) + i;
 
         memset(pNewBone, 0, sizeof(r5_mstudiobone_t));
 
@@ -1341,17 +1343,17 @@ static void R5_ConvertBones(const studiohdr_t* pOld)
 
         pNewBone->parent = pOldBone->parent;
         memcpy(&pNewBone->bonecontroller, &pOldBone->bonecontroller, sizeof(pOldBone->bonecontroller));
-        pNewBone->pos        = pOldBone->pos;
-        pNewBone->quat       = pOldBone->quat;
-        pNewBone->rot        = pOldBone->rot;
-        pNewBone->scale      = Vector(1, 1, 1); // r5 adds scale field
+        pNewBone->pos = pOldBone->pos;
+        pNewBone->quat = pOldBone->quat;
+        pNewBone->rot = pOldBone->rot;
+        pNewBone->scale = Vector(1, 1, 1); // r5 adds scale field
         pNewBone->poseToBone = pOldBone->poseToBone;
         pNewBone->qAlignment = pOldBone->qAlignment;
-        pNewBone->flags      = pOldBone->flags;
-        pNewBone->proctype   = pOldBone->proctype;
-        pNewBone->procindex  = pOldBone->procindex;
+        pNewBone->flags = pOldBone->flags;
+        pNewBone->proctype = pOldBone->proctype;
+        pNewBone->procindex = pOldBone->procindex;
         pNewBone->physicsbone = pOldBone->physicsbone;
-        pNewBone->contents   = pOldBone->contents;
+        pNewBone->contents = pOldBone->contents;
         pNewBone->surfacepropLookup = pOldBone->surfacepropLookup;
     }
 
@@ -1384,24 +1386,24 @@ static void R5_ConvertBones(const studiohdr_t* pOld)
             if (oldFlags & 0x01) newFlags |= 0x01; // IS_FLEXIBLE
         }
 
-        pNewJiggle->flags   = newFlags;
-        pNewJiggle->bone    = (uint8_t)i;
-        pNewJiggle->length  = pOldJiggle->length;
+        pNewJiggle->flags = newFlags;
+        pNewJiggle->bone = (uint8_t)i;
+        pNewJiggle->length = pOldJiggle->length;
         pNewJiggle->tipMass = pOldJiggle->tipMass;
-        pNewJiggle->yawStiffness  = pOldJiggle->yawStiffness;
-        pNewJiggle->yawDamping    = pOldJiggle->yawDamping;
+        pNewJiggle->yawStiffness = pOldJiggle->yawStiffness;
+        pNewJiggle->yawDamping = pOldJiggle->yawDamping;
         pNewJiggle->pitchStiffness = pOldJiggle->pitchStiffness;
-        pNewJiggle->pitchDamping  = pOldJiggle->pitchDamping;
+        pNewJiggle->pitchDamping = pOldJiggle->pitchDamping;
         pNewJiggle->alongStiffness = pOldJiggle->alongStiffness;
-        pNewJiggle->alongDamping  = pOldJiggle->alongDamping;
-        pNewJiggle->angleLimit    = pOldJiggle->angleLimit;
+        pNewJiggle->alongDamping = pOldJiggle->alongDamping;
+        pNewJiggle->angleLimit = pOldJiggle->angleLimit;
         pNewJiggle->minYaw = pOldJiggle->minYaw; pNewJiggle->maxYaw = pOldJiggle->maxYaw;
         pNewJiggle->yawFriction = pOldJiggle->yawFriction; pNewJiggle->yawBounce = pOldJiggle->yawBounce;
-        pNewJiggle->baseMass    = pOldJiggle->baseMass;    pNewJiggle->baseStiffness = pOldJiggle->baseStiffness;
+        pNewJiggle->baseMass = pOldJiggle->baseMass;    pNewJiggle->baseStiffness = pOldJiggle->baseStiffness;
         pNewJiggle->baseDamping = pOldJiggle->baseDamping;
         pNewJiggle->baseMinLeft = pOldJiggle->baseMinLeft; pNewJiggle->baseMaxLeft = pOldJiggle->baseMaxLeft;
         pNewJiggle->baseLeftFriction = pOldJiggle->baseLeftFriction;
-        pNewJiggle->baseMinUp   = pOldJiggle->baseMinUp;   pNewJiggle->baseMaxUp = pOldJiggle->baseMaxUp;
+        pNewJiggle->baseMinUp = pOldJiggle->baseMinUp;   pNewJiggle->baseMaxUp = pOldJiggle->baseMaxUp;
         pNewJiggle->baseUpFriction = pOldJiggle->baseUpFriction;
         pNewJiggle->baseMinForward = pOldJiggle->baseMinForward; pNewJiggle->baseMaxForward = pOldJiggle->baseMaxForward;
         pNewJiggle->baseForwardFriction = pOldJiggle->baseForwardFriction;
@@ -1448,13 +1450,13 @@ static void R5_ConvertAttachments(const studiohdr_t* pOld)
     for (int i = 0; i < num; i++)
     {
         const mstudioattachment_t* pOldAtt = pOld->pLocalAttachment(i);
-        r5_mstudioattachment_t*    pNewAtt = reinterpret_cast<r5_mstudioattachment_t*>(s_pData) + i;
+        r5_mstudioattachment_t* pNewAtt = reinterpret_cast<r5_mstudioattachment_t*>(s_pData) + i;
 
         memset(pNewAtt, 0, sizeof(r5_mstudioattachment_t));
         R5_AddToStringTable((char*)pNewAtt, &pNewAtt->sznameindex,
             RMDL_STRING_FROM_IDX(pOldAtt, pOldAtt->sznameindex));
 
-        pNewAtt->flags     = pOldAtt->flags;
+        pNewAtt->flags = pOldAtt->flags;
         pNewAtt->localbone = pOldAtt->localbone;
         memcpy(&pNewAtt->localmatrix, &pOldAtt->local, sizeof(matrix3x4_t));
     }
@@ -1475,7 +1477,7 @@ static void R5_ConvertHitboxes(const studiohdr_t* pOld)
     for (int i = 0; i < numSets; i++)
     {
         const mstudiohitboxset_t* pOldSet = pOld->pHitboxSet(i);
-        r5_mstudiohitboxset_t*    pNewSet = newSets + i;
+        r5_mstudiohitboxset_t* pNewSet = newSets + i;
 
         R5_AddToStringTable((char*)pNewSet, &pNewSet->sznameindex,
             RMDL_STRING_FROM_IDX(pOldSet, pOldSet->sznameindex));
@@ -1493,12 +1495,12 @@ static void R5_ConvertHitboxes(const studiohdr_t* pOld)
         for (int j = 0; j < pOldSet->numhitboxes; j++)
         {
             const mstudiobbox_t* pOldBox = pOldSet->pHitbox(j);
-            r5_mstudiobbox_t*    pNewBox = reinterpret_cast<r5_mstudiobbox_t*>(s_pData);
+            r5_mstudiobbox_t* pNewBox = reinterpret_cast<r5_mstudiobbox_t*>(s_pData);
 
-            pNewBox->bone             = pOldBox->bone;
-            pNewBox->group            = pOldBox->group;
-            pNewBox->bbmin            = pOldBox->bbmin;
-            pNewBox->bbmax            = pOldBox->bbmax;
+            pNewBox->bone = pOldBox->bone;
+            pNewBox->group = pOldBox->group;
+            pNewBox->bbmin = pOldBox->bbmin;
+            pNewBox->bbmax = pOldBox->bbmax;
             pNewBox->critShotOverride = 0; // no crit override
 
             R5_AddToStringTable((char*)pNewBox, &pNewBox->szhitboxnameindex,
@@ -1530,26 +1532,26 @@ static void R5_WriteDefaultSequence()
     memset(pSeq, 0, sizeof(r5_mstudioseqdesc_t));
 
     s_pHdr->localseqindex = (int)(s_pData - s_pBase);
-    s_pHdr->numlocalseq   = 1;
+    s_pHdr->numlocalseq = 1;
 
-    pSeq->baseptr   = 0;
+    pSeq->baseptr = 0;
     R5_AddToStringTable((char*)pSeq, &pSeq->szlabelindex, "ref");
     R5_AddToStringTable((char*)pSeq, &pSeq->szactivitynameindex, "");
 
-    pSeq->activity       = -1;
-    pSeq->bbmin          = s_pHdr->hull_min;
-    pSeq->bbmax          = s_pHdr->hull_max;
-    pSeq->groupsize[0]   = 1;
-    pSeq->groupsize[1]   = 1;
-    pSeq->paramindex[0]  = -1;
-    pSeq->paramindex[1]  = -1;
-    pSeq->fadeintime     = 0.2f;
-    pSeq->fadeouttime    = 0.2f;
+    pSeq->activity = -1;
+    pSeq->bbmin = s_pHdr->hull_min;
+    pSeq->bbmax = s_pHdr->hull_max;
+    pSeq->groupsize[0] = 1;
+    pSeq->groupsize[1] = 1;
+    pSeq->paramindex[0] = -1;
+    pSeq->paramindex[1] = -1;
+    pSeq->fadeintime = 0.2f;
+    pSeq->fadeouttime = 0.2f;
 
     // eventindex / autolayer / weightlist all point to right after seq (empty)
-    pSeq->eventindex       = (int)sizeof(*pSeq);
-    pSeq->autolayerindex   = (int)sizeof(*pSeq);
-    pSeq->weightlistindex  = (int)sizeof(*pSeq);
+    pSeq->eventindex = (int)sizeof(*pSeq);
+    pSeq->autolayerindex = (int)sizeof(*pSeq);
+    pSeq->weightlistindex = (int)sizeof(*pSeq);
 
     s_pData += sizeof(r5_mstudioseqdesc_t);
 
@@ -1572,7 +1574,7 @@ static void R5_WriteDefaultSequence()
     memset(pAnim, 0, sizeof(r5_mstudioanimdesc_t));
 
     R5_AddToStringTable((char*)pAnim, &pAnim->sznameindex, "@ref");
-    pAnim->fps   = 30.0f;
+    pAnim->fps = 30.0f;
     pAnim->flags = 0x0020; // STUDIO_ALLZEROS
 
     s_pData += sizeof(r5_mstudioanimdesc_t);
@@ -1591,13 +1593,13 @@ static void R5_ConvertBodyParts(const studiohdr_t* pOld)
     for (int i = 0; i < numBP; i++)
     {
         const mstudiobodyparts_t* pOldBP = pOld->pBodypart(i);
-        r5_mstudiobodyparts_t*    pNewBP = newBPs + i;
+        r5_mstudiobodyparts_t* pNewBP = newBPs + i;
 
         R5_AddToStringTable((char*)pNewBP, &pNewBP->sznameindex,
             RMDL_STRING_FROM_IDX(pOldBP, pOldBP->sznameindex));
 
         pNewBP->nummodels = pOldBP->nummodels;
-        pNewBP->base      = pOldBP->base;
+        pNewBP->base = pOldBP->base;
 
         s_pData += sizeof(r5_mstudiobodyparts_t);
     }
@@ -1606,7 +1608,7 @@ static void R5_ConvertBodyParts(const studiohdr_t* pOld)
     for (int i = 0; i < numBP; i++)
     {
         const mstudiobodyparts_t* pOldBP = pOld->pBodypart(i);
-        r5_mstudiobodyparts_t*    pNewBP = newBPs + i;
+        r5_mstudiobodyparts_t* pNewBP = newBPs + i;
 
         pNewBP->modelindex = (int)(s_pData - (char*)pNewBP);
 
@@ -1615,17 +1617,17 @@ static void R5_ConvertBodyParts(const studiohdr_t* pOld)
         for (int j = 0; j < pOldBP->nummodels; j++)
         {
             const mstudiomodel_t* pOldMdl = pOldBP->pModel(j);
-            r5_mstudiomodel_t*    pNewMdl = newModels + j;
+            r5_mstudiomodel_t* pNewMdl = newModels + j;
             memset(pNewMdl, 0, sizeof(r5_mstudiomodel_t));
 
             memcpy(pNewMdl->name, pOldMdl->name, sizeof(pNewMdl->name));
-            pNewMdl->type            = pOldMdl->type;
-            pNewMdl->boundingradius  = pOldMdl->boundingradius;
-            pNewMdl->nummeshes       = pOldMdl->nummeshes;
-            pNewMdl->numvertices     = pOldMdl->numvertices;
-            pNewMdl->vertexindex     = pOldMdl->vertexindex;
-            pNewMdl->tangentsindex   = pOldMdl->tangentsindex;
-            pNewMdl->numattachments  = pOldMdl->numattachments;
+            pNewMdl->type = pOldMdl->type;
+            pNewMdl->boundingradius = pOldMdl->boundingradius;
+            pNewMdl->nummeshes = pOldMdl->nummeshes;
+            pNewMdl->numvertices = pOldMdl->numvertices;
+            pNewMdl->vertexindex = pOldMdl->vertexindex;
+            pNewMdl->tangentsindex = pOldMdl->tangentsindex;
+            pNewMdl->numattachments = pOldMdl->numattachments;
             pNewMdl->attachmentindex = pOldMdl->attachmentindex;
 
             s_pData += sizeof(r5_mstudiomodel_t);
@@ -1635,23 +1637,23 @@ static void R5_ConvertBodyParts(const studiohdr_t* pOld)
         for (int j = 0; j < pOldBP->nummodels; j++)
         {
             const mstudiomodel_t* pOldMdl = pOldBP->pModel(j);
-            r5_mstudiomodel_t*    pNewMdl = newModels + j;
+            r5_mstudiomodel_t* pNewMdl = newModels + j;
 
             pNewMdl->meshindex = (int)(s_pData - (char*)pNewMdl);
 
             for (int k = 0; k < pOldMdl->nummeshes; k++)
             {
                 const mstudiomesh_t* pOldMesh = pOldMdl->pMesh(k);
-                r5_mstudiomesh_t*    pNewMesh  = reinterpret_cast<r5_mstudiomesh_t*>(s_pData);
+                r5_mstudiomesh_t* pNewMesh = reinterpret_cast<r5_mstudiomesh_t*>(s_pData);
 
                 memset(pNewMesh, 0, sizeof(r5_mstudiomesh_t));
 
-                pNewMesh->material    = pOldMesh->material;
-                pNewMesh->modelindex  = (int)((char*)pNewMdl - (char*)pNewMesh);
+                pNewMesh->material = pOldMesh->material;
+                pNewMesh->modelindex = (int)((char*)pNewMdl - (char*)pNewMesh);
                 pNewMesh->numvertices = pOldMesh->numvertices;
                 pNewMesh->vertexoffset = pOldMesh->vertexoffset;
-                pNewMesh->meshid      = pOldMesh->meshid;
-                pNewMesh->center      = pOldMesh->center;
+                pNewMesh->meshid = pOldMesh->meshid;
+                pNewMesh->center = pOldMesh->center;
                 memcpy(&pNewMesh->vertexloddata, &pOldMesh->vertexdata,
                     sizeof(r5_mstudio_meshvertexdata_t));
 
@@ -1668,21 +1670,21 @@ static void R5_ConvertPoseParams(const studiohdr_t* pOld)
     int num = pOld->numlocalposeparameters;
     if (num <= 0) return;
 
-    s_pHdr->localposeparamindex  = (int)(s_pData - s_pBase);
+    s_pHdr->localposeparamindex = (int)(s_pData - s_pBase);
     s_pHdr->numlocalposeparameters = num;
 
     for (int i = 0; i < num; i++)
     {
         const mstudioposeparamdesc_t* pOldPP = pOld->pLocalPoseParameter(i);
-        r5_mstudioposeparamdesc_t*    pNewPP = reinterpret_cast<r5_mstudioposeparamdesc_t*>(s_pData) + i;
+        r5_mstudioposeparamdesc_t* pNewPP = reinterpret_cast<r5_mstudioposeparamdesc_t*>(s_pData) + i;
 
         R5_AddToStringTable((char*)pNewPP, &pNewPP->sznameindex,
             RMDL_STRING_FROM_IDX(pOldPP, pOldPP->sznameindex));
 
         pNewPP->flags = pOldPP->flags;
         pNewPP->start = pOldPP->start;
-        pNewPP->end   = pOldPP->end;
-        pNewPP->loop  = pOldPP->loop;
+        pNewPP->end = pOldPP->end;
+        pNewPP->loop = pOldPP->loop;
     }
 
     s_pData += num * sizeof(r5_mstudioposeparamdesc_t);
@@ -1728,7 +1730,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
         for (char& c : modelDir) if (c == '\\') c = '/';
         // Strip extension if present (e.g. ".mdl").
         {
-            auto dot   = modelDir.rfind('.');
+            auto dot = modelDir.rfind('.');
             auto slash = modelDir.rfind('/');
             if (dot != std::string::npos &&
                 (slash == std::string::npos || dot > slash))
@@ -1755,7 +1757,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
                 std::string cdpLow = cdp;
                 for (char& c : cdpLow) c = (char)tolower((unsigned char)c);
                 if (cdpLow.compare(cdpLow.size() - modelDirLow.size(),
-                                   modelDirLow.size(), modelDirLow) == 0)
+                    modelDirLow.size(), modelDirLow) == 0)
                     score = (int)modelDirLow.size();
             }
             if (score > bestScore)
@@ -1765,7 +1767,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
             }
         }
         printf("  [RMDL] model dir '%s' -> best cdmaterials '%s'\n",
-               modelDir.c_str(), bestCdPath.c_str());
+            modelDir.c_str(), bestCdPath.c_str());
     }
 
     s_pHdr->textureindex = (int)(s_pData - s_pBase);
@@ -1778,7 +1780,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
     for (int i = 0; i < numTex; i++)
     {
         const mstudiotexture_t* pOldTex = pOld->pTexture(i);
-        r5_mstudiotexture_t*    pNewTex = reinterpret_cast<r5_mstudiotexture_t*>(s_pData);
+        r5_mstudiotexture_t* pNewTex = reinterpret_cast<r5_mstudiotexture_t*>(s_pData);
         memset(pNewTex, 0, sizeof(r5_mstudiotexture_t));
 
         const char* texName = RMDL_STRING_FROM_IDX(pOldTex, pOldTex->sznameindex);
@@ -1808,9 +1810,9 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
                     printf("\n  [RMDL] -cdpick: pick cdmaterials for '%s'\n", texName);
                     for (int ci = 0; ci < (int)cdPaths.size(); ci++)
                         printf("         %d: %s%s\n", ci + 1,
-                               cdPaths[ci].c_str(), texName);
+                            cdPaths[ci].c_str(), texName);
                     printf("         [auto=%s] Enter number or press Enter to accept: ",
-                           bestCdPath.c_str());
+                        bestCdPath.c_str());
                     fflush(stdout);
                     char buf[16] = {};
                     if (fgets(buf, sizeof(buf), stdin))
@@ -1864,8 +1866,8 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
     R5_AlignData(s_pData);
 
     // CDtexture (single empty entry)
-    s_pHdr->cdtextureindex  = (int)(s_pData - s_pBase);
-    s_pHdr->numcdtextures   = 1;
+    s_pHdr->cdtextureindex = (int)(s_pData - s_pBase);
+    s_pHdr->numcdtextures = 1;
 
     R5_AddToStringTable(s_pBase, reinterpret_cast<int*>(s_pData), "");
     s_pData += sizeof(int);
@@ -1873,14 +1875,14 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
 
 static void R5_ConvertSkins(const studiohdr_t* pOld)
 {
-    int numRef    = pOld->numskinref;
-    int numFam    = pOld->numskinfamilies;
+    int numRef = pOld->numskinref;
+    int numFam = pOld->numskinfamilies;
     if (numRef <= 0 || numFam <= 0) return;
 
     printf("  [RMDL] Converting %d skins (%d refs)...\n", numFam, numRef);
 
-    s_pHdr->skinindex      = (int)(s_pData - s_pBase);
-    s_pHdr->numskinref     = numRef;
+    s_pHdr->skinindex = (int)(s_pData - s_pBase);
+    s_pHdr->numskinref = numRef;
     s_pHdr->numskinfamilies = numFam;
 
     int skinSize = sizeof(short) * numRef * numFam;
@@ -1908,7 +1910,7 @@ static void R5_WriteKeyValues()
     int kvPadded = (kvLen + 1) & ~1; // align to 2
 
     s_pHdr->keyvalueindex = (int)(s_pData - s_pBase);
-    s_pHdr->keyvaluesize  = kvPadded;
+    s_pHdr->keyvaluesize = kvPadded;
 
     memcpy(s_pData, kv, kvLen);
     s_pData += kvPadded;
@@ -1923,7 +1925,7 @@ static void R5_ConvertSrcBoneTransforms(const studiohdr_t* pOld)
 
     printf("  [RMDL] Converting %d src bone transforms...\n", num);
 
-    s_pHdr->numsrcbonetransform    = num;
+    s_pHdr->numsrcbonetransform = num;
     s_pHdr->srcbonetransformindex = (int)(s_pData - s_pBase);
 
     const mstudiosrcbonetransform_t* pOldXF =
@@ -1938,7 +1940,7 @@ static void R5_ConvertSrcBoneTransforms(const studiohdr_t* pOld)
         R5_AddToStringTable((char*)pNewXF, &pNewXF->sznameindex,
             RMDL_STRING_FROM_IDX(&pOldXF[i], pOldXF[i].sznameindex));
 
-        memcpy(&pNewXF->pretransform,  &pOldXF[i].pretransform,  sizeof(matrix3x4_t));
+        memcpy(&pNewXF->pretransform, &pOldXF[i].pretransform, sizeof(matrix3x4_t));
         memcpy(&pNewXF->posttransform, &pOldXF[i].posttransform, sizeof(matrix3x4_t));
     }
 
@@ -1967,13 +1969,13 @@ static void R5_ConvertLinearBones(const studiohdr_t* pOld)
     // so we need to subtract the difference (64 - 28 = 36) from all indices
     int indexAdjust = (int)sizeof(mstudiolinearbone_t) - (int)sizeof(r5_mstudiolinearbone_t);
 
-    pNewLB->numbones         = pOldLB->numbones;
-    pNewLB->flagsindex       = pOldLB->flagsindex - indexAdjust;
-    pNewLB->parentindex      = pOldLB->parentindex - indexAdjust;
-    pNewLB->posindex         = pOldLB->posindex - indexAdjust;
-    pNewLB->quatindex        = pOldLB->quatindex - indexAdjust;
-    pNewLB->rotindex         = pOldLB->rotindex - indexAdjust;
-    pNewLB->posetoboneindex  = pOldLB->posetoboneindex - indexAdjust;
+    pNewLB->numbones = pOldLB->numbones;
+    pNewLB->flagsindex = pOldLB->flagsindex - indexAdjust;
+    pNewLB->parentindex = pOldLB->parentindex - indexAdjust;
+    pNewLB->posindex = pOldLB->posindex - indexAdjust;
+    pNewLB->quatindex = pOldLB->quatindex - indexAdjust;
+    pNewLB->rotindex = pOldLB->rotindex - indexAdjust;
+    pNewLB->posetoboneindex = pOldLB->posetoboneindex - indexAdjust;
 
     s_pData += sizeof(r5_mstudiolinearbone_t);
 
@@ -2045,7 +2047,7 @@ static std::string R5_FileStem(const std::string& path)
 //   -> "weapons\p2011\p2011.mdl"
 // Used to locate the phy file that collisionmodel.cpp writes under gamedir\models\.
 static std::string R5_RelativeToGamedir(const std::string& mdlPath,
-                                         const std::string& gamedirStr)
+    const std::string& gamedirStr)
 {
     std::string rel = mdlPath;
     if (rel.size() > gamedirStr.size() &&
@@ -2069,10 +2071,10 @@ static void R5_RunAnimConv(const char* mdlFilePath)
 {
     printf("[RMDL] Running in-process anim conversion on '%s'\n", mdlFilePath);
     R5_ConvertMDLAnimations(mdlFilePath,
-                             gamedir,
-                             s_overrideRrigPath.c_str(),
-                             s_overrideRseqPath.c_str(),
-                             /*verbose=*/false);
+        gamedir,
+        s_overrideRrigPath.c_str(),
+        s_overrideRseqPath.c_str(),
+        /*verbose=*/false);
 }
 
 //-----------------------------------------------------------------------------
@@ -2109,7 +2111,7 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
     const int numMeshes = (int)ruiFile.meshes.size();
 
     // Record where the ruiheader[] array starts in the output buffer.
-    s_pHdr->uiPanelCount  = numMeshes;
+    s_pHdr->uiPanelCount = numMeshes;
     s_pHdr->uiPanelOffset = (int)(s_pData - s_pBase);
 
     // -----------------------------------------------------------------------
@@ -2163,7 +2165,7 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
             if (it == boneMap.end())
             {
                 printf("  [RUI] WARNING: bone '%s' not found for mesh '%s', defaulting to 0\n",
-                       bn.c_str(), mesh.name.c_str());
+                    bn.c_str(), mesh.name.c_str());
                 parentIndices.push_back(0);
             }
             else
@@ -2172,13 +2174,13 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
             }
         }
 
-        const int numParents  = (int)parentIndices.size();
+        const int numParents = (int)parentIndices.size();
         const int numVertices = (int)mesh.vertices.size();
-        const int numFaces    = (int)mesh.faces.size();
+        const int numFaces = (int)mesh.faces.size();
 
         // Record where this mesh blob starts (for the header entry).
         const int meshStartAbs = (int)(s_pData - s_pBase);
-        const int hdrEntryAbs  = s_pHdr->uiPanelOffset + mi * (int)sizeof(RuiHdrEntry);
+        const int hdrEntryAbs = s_pHdr->uiPanelOffset + mi * (int)sizeof(RuiHdrEntry);
         headers[mi].ruimeshindex = meshStartAbs - hdrEntryAbs;
 
         // -----------------------------------------------------------------------
@@ -2193,11 +2195,11 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
         const int preVertexFixed = 28 + nameLen + 2 * numParents + 8 * numFaces;
         const int padding = (16 - (meshStartAbs + preVertexFixed) % 16) % 16;
 
-        const int parentindex   = 28 + nameLen + padding;
-        const int vertmapindex  = parentindex  + 2 * numParents;
-        const int unkindex      = vertmapindex + 6 * numFaces;   // fourthvert array
-        const int vertexindex   = unkindex     + 2 * numFaces;
-        const int facedataindex = vertexindex  + 16 * numVertices;
+        const int parentindex = 28 + nameLen + padding;
+        const int vertmapindex = parentindex + 2 * numParents;
+        const int unkindex = vertmapindex + 6 * numFaces;   // fourthvert array
+        const int vertexindex = unkindex + 2 * numFaces;
+        const int facedataindex = vertexindex + 16 * numVertices;
 
         // -----------------------------------------------------------------------
         // Write mstudioruimesh_t_v54 (28 bytes, explicit layout).
@@ -2219,13 +2221,13 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
         static_assert(sizeof(RuiMeshHdr) == 28, "RuiMeshHdr must be 28 bytes");
 
         RuiMeshHdr mhdr = {};
-        mhdr.numparents   = (int16_t)numParents;
-        mhdr.numvertices  = (int16_t)numVertices;
-        mhdr.numfaces     = (int16_t)numFaces;
-        mhdr.unk          = (mesh.unk >= 0) ? mesh.unk : (int16_t)numFaces;
-        mhdr.parentindex  = parentindex;
-        mhdr.vertexindex  = vertexindex;
-        mhdr.unkindex     = unkindex;
+        mhdr.numparents = (int16_t)numParents;
+        mhdr.numvertices = (int16_t)numVertices;
+        mhdr.numfaces = (int16_t)numFaces;
+        mhdr.unk = (mesh.unk >= 0) ? mesh.unk : (int16_t)numFaces;
+        mhdr.parentindex = parentindex;
+        mhdr.vertexindex = vertexindex;
+        mhdr.unkindex = unkindex;
         mhdr.vertmapindex = vertmapindex;
         mhdr.facedataindex = facedataindex;
         memcpy(s_pData, &mhdr, 28);
@@ -2267,18 +2269,18 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
             auto it = boneMap.find(vert.boneName);
             int32_t boneIdx = (it != boneMap.end()) ? it->second : 0;
             memcpy(s_pData, &boneIdx, 4); s_pData += 4;
-            memcpy(s_pData, &vert.x,    4); s_pData += 4;
-            memcpy(s_pData, &vert.y,    4); s_pData += 4;
-            memcpy(s_pData, &vert.z,    4); s_pData += 4;
+            memcpy(s_pData, &vert.x, 4); s_pData += 4;
+            memcpy(s_pData, &vert.y, 4); s_pData += 4;
+            memcpy(s_pData, &vert.z, 4); s_pData += 4;
         }
 
         // Face data: 8 floats = 32 bytes each (mstudioruimeshface_t).
         for (const RuiFace& face : mesh.faces)
         {
-            memcpy(s_pData, &face.uvminx,    4); s_pData += 4;
-            memcpy(s_pData, &face.uvminy,    4); s_pData += 4;
-            memcpy(s_pData, &face.uvmaxx,    4); s_pData += 4;
-            memcpy(s_pData, &face.uvmaxy,    4); s_pData += 4;
+            memcpy(s_pData, &face.uvminx, 4); s_pData += 4;
+            memcpy(s_pData, &face.uvminy, 4); s_pData += 4;
+            memcpy(s_pData, &face.uvmaxx, 4); s_pData += 4;
+            memcpy(s_pData, &face.uvmaxy, 4); s_pData += 4;
             memcpy(s_pData, &face.scaleminx, 4); s_pData += 4;
             memcpy(s_pData, &face.scaleminy, 4); s_pData += 4;
             memcpy(s_pData, &face.scalemaxx, 4); s_pData += 4;
@@ -2286,7 +2288,7 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
         }
 
         printf("  [RUI] mesh[%d] '%s'  parents=%d  verts=%d  faces=%d\n",
-               mi, mesh.name.c_str(), numParents, numVertices, numFaces);
+            mi, mesh.name.c_str(), numParents, numVertices, numFaces);
     }
 
     // 4-byte align after the whole RUI blob before the next section.
@@ -2295,9 +2297,9 @@ static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHd
 
 void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
 {
-    s_bZeroGuids    = (CommandLine()->FindParm("-vmtext")      != 0);
+    s_bZeroGuids = (CommandLine()->FindParm("-vmtext") != 0);
     s_bConvertAnims = (CommandLine()->FindParm("-convertanims") != 0);
-    s_bCdPick       = (CommandLine()->FindParm("-cdpick")       != 0);
+    s_bCdPick = (CommandLine()->FindParm("-cdpick") != 0);
 
     const char* rpVal = CommandLine()->ParmValue("-rp", (const char*)nullptr);
     s_overrideRrigPath = rpVal ? rpVal : "";
@@ -2311,8 +2313,8 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     printf("\n[RMDL] Writing v10...\n");
 
     std::string mdlPath(mdlFilePath);
-    std::string vvdPath  = R5_ReplaceExt(mdlPath, ".vvd");
-    std::string vtxPath  = R5_ReplaceExt(mdlPath, ".dx90.vtx");
+    std::string vvdPath = R5_ReplaceExt(mdlPath, ".vvd");
+    std::string vtxPath = R5_ReplaceExt(mdlPath, ".dx90.vtx");
 
     // All output goes into gamedir\compiled\:
     //   gamedir\compiled\modelname.rmdl
@@ -2329,14 +2331,14 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     const std::string compiledDir = gamedirStr + "compiled\\";
     CreateDirectoryA(compiledDir.c_str(), NULL);
 
-    const std::string stem     = R5_FileStem(mdlPath);
+    const std::string stem = R5_FileStem(mdlPath);
     const std::string rmdlPath = compiledDir + stem + ".rmdl";
-    const std::string vgPath   = compiledDir + stem + ".vg";
+    const std::string vgPath = compiledDir + stem + ".vg";
 
     // Where collisionmodel.cpp wrote the phy (gamedir\models\<rel>\stem.phy)
-    const std::string relStem  = R5_ReplaceExt(R5_RelativeToGamedir(mdlPath, gamedirStr), "");
-    const std::string phySrc   = gamedirStr + "models\\" + relStem + ".phy";
-    const std::string phyDst   = compiledDir + stem + ".phy";
+    const std::string relStem = R5_ReplaceExt(R5_RelativeToGamedir(mdlPath, gamedirStr), "");
+    const std::string phySrc = gamedirStr + "models\\" + relStem + ".phy";
+    const std::string phyDst = compiledDir + stem + ".phy";
 
     // MDL is already in memory — no disk read needed.
     const studiohdr_t* pOldHdr = pInMemMDL;
@@ -2346,7 +2348,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
 
     // Load VVD
     size_t vvdSize = 0;
-    char*  vvdBuf  = R5_LoadFile(vvdPath.c_str(), vvdSize);
+    char* vvdBuf = R5_LoadFile(vvdPath.c_str(), vvdSize);
     if (!vvdBuf)
     {
         printf("ERROR: Could not load VVD '%s'\n", vvdPath.c_str());
@@ -2355,7 +2357,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
 
     // Load VTX
     size_t vtxSize = 0;
-    char*  vtxBuf  = R5_LoadFile(vtxPath.c_str(), vtxSize);
+    char* vtxBuf = R5_LoadFile(vtxPath.c_str(), vtxSize);
     if (!vtxBuf)
     {
         printf("ERROR: Could not load VTX '%s'\n", vtxPath.c_str());
@@ -2369,7 +2371,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     // Allocate output buffer
     s_pBase = new char[RMDL_FILEBUF_SIZE]();
     s_pData = s_pBase;
-    s_pHdr  = nullptr;
+    s_pHdr = nullptr;
 
     R5_BeginStringTable();
 
@@ -2379,42 +2381,42 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     s_pHdr = reinterpret_cast<r5_studiohdr_t*>(s_pData);
     memset(s_pHdr, 0, sizeof(r5_studiohdr_t));
 
-    s_pHdr->id       = R5_IDSTUDIOHEADER;
-    s_pHdr->version  = R5_STUDIO_VERSION;
+    s_pHdr->id = R5_IDSTUDIOHEADER;
+    s_pHdr->version = R5_STUDIO_VERSION;
     s_pHdr->checksum = pOldHdr->checksum;
-    s_pHdr->length   = 0xBADF00D; // filled later
+    s_pHdr->length = 0xBADF00D; // filled later
 
-    s_pHdr->eyeposition  = pOldHdr->eyeposition;
+    s_pHdr->eyeposition = pOldHdr->eyeposition;
     s_pHdr->illumposition = pOldHdr->illumposition;
-    s_pHdr->hull_min     = pOldHdr->hull_min;
-    s_pHdr->hull_max     = pOldHdr->hull_max;
-    s_pHdr->mins         = pOldHdr->hull_min;
-    s_pHdr->maxs         = pOldHdr->hull_max;
-    s_pHdr->view_bbmin   = pOldHdr->view_bbmin;
-    s_pHdr->view_bbmax   = pOldHdr->view_bbmax;
+    s_pHdr->hull_min = pOldHdr->hull_min;
+    s_pHdr->hull_max = pOldHdr->hull_max;
+    s_pHdr->mins = pOldHdr->hull_min;
+    s_pHdr->maxs = pOldHdr->hull_max;
+    s_pHdr->view_bbmin = pOldHdr->view_bbmin;
+    s_pHdr->view_bbmax = pOldHdr->view_bbmax;
 
-    s_pHdr->flags          = pOldHdr->flags;
-    s_pHdr->numbones       = pOldHdr->numbones;
-    s_pHdr->numhitboxsets  = pOldHdr->numhitboxsets;
-    s_pHdr->numlocalseq    = 0; // set later
-    s_pHdr->numlocalanim   = 0; // unused
+    s_pHdr->flags = pOldHdr->flags;
+    s_pHdr->numbones = pOldHdr->numbones;
+    s_pHdr->numhitboxsets = pOldHdr->numhitboxsets;
+    s_pHdr->numlocalseq = 0; // set later
+    s_pHdr->numlocalanim = 0; // unused
     s_pHdr->activitylistversion = pOldHdr->activitylistversion;
-    s_pHdr->numtextures    = pOldHdr->numtextures;
-    s_pHdr->numskinref     = pOldHdr->numskinref;
+    s_pHdr->numtextures = pOldHdr->numtextures;
+    s_pHdr->numskinref = pOldHdr->numskinref;
     s_pHdr->numskinfamilies = pOldHdr->numskinfamilies;
-    s_pHdr->numbodyparts   = pOldHdr->numbodyparts;
+    s_pHdr->numbodyparts = pOldHdr->numbodyparts;
     s_pHdr->numlocalattachments = pOldHdr->numlocalattachments;
-    s_pHdr->keyvaluesize   = pOldHdr->keyvaluesize;
+    s_pHdr->keyvaluesize = pOldHdr->keyvaluesize;
     s_pHdr->numincludemodels = -1;
     s_pHdr->numsrcbonetransform = pOldHdr->pStudioHdr2()->numsrcbonetransform;
-    s_pHdr->mass           = pOldHdr->mass;
-    s_pHdr->contents       = pOldHdr->contents;
+    s_pHdr->mass = pOldHdr->mass;
+    s_pHdr->contents = pOldHdr->contents;
     s_pHdr->constdirectionallightdot = pOldHdr->constdirectionallightdot;
-    s_pHdr->rootLOD        = pOldHdr->rootLOD;
+    s_pHdr->rootLOD = pOldHdr->rootLOD;
     s_pHdr->numAllowedRootLODs = pOldHdr->numAllowedRootLODs;
     s_pHdr->flVertAnimFixedPointScale = pOldHdr->flVertAnimFixedPointScale;
     s_pHdr->phyOffset = -123456;  // sentinel for no embedded .phy (matches rmdlconv and working game models)
-    s_pHdr->phySize   = 0;
+    s_pHdr->phySize = 0;
 
     s_pData += sizeof(r5_studiohdr_t);
 
@@ -2423,8 +2425,8 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     std::string modelName = oldName;
     if (modelName.find("mdl/") != 0)
         modelName = "mdl/" + modelName;
-    if (modelName.size() > 4 && modelName.compare(modelName.size()-4, 4, ".mdl") == 0)
-        modelName = modelName.substr(0, modelName.size()-4) + ".rmdl";
+    if (modelName.size() > 4 && modelName.compare(modelName.size() - 4, 4, ".mdl") == 0)
+        modelName = modelName.substr(0, modelName.size() - 4) + ".rmdl";
 
     memset(s_pHdr->name, 0, 64);
     strncpy(s_pHdr->name, modelName.c_str(), 63);
@@ -2459,13 +2461,13 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
         if (ParseRuiFile(s_ruiMeshFilePath.c_str(), ruiFile))
         {
             printf("  [RUI] Loaded %d mesh(es) from '%s'\n",
-                   (int)ruiFile.meshes.size(), s_ruiMeshFilePath.c_str());
+                (int)ruiFile.meshes.size(), s_ruiMeshFilePath.c_str());
             R5_WriteRuiSection(ruiFile, pOldHdr);
         }
         else
         {
             printf("  [RUI] WARNING: failed to parse '%s', skipping RUI section\n",
-                   s_ruiMeshFilePath.c_str());
+                s_ruiMeshFilePath.c_str());
         }
     }
 
@@ -2520,36 +2522,43 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     //-----------------------------------------------------------------------
     // Cleanup in-memory buffers
     //-----------------------------------------------------------------------
+    int savedChecksum = s_pHdr ? s_pHdr->checksum : 0;
+
     delete[] s_pBase;
     delete[] vvdBuf;
     delete[] vtxBuf;
 
     s_pBase = nullptr;
     s_pData = nullptr;
-    s_pHdr  = nullptr;
+    s_pHdr = nullptr;
     s_stringTable.clear();
 
     //-----------------------------------------------------------------------
-    // Convert studiomdl .phy → Apex IVPS format and write to compiled\.
+    // Convert studiomdl .phy → Apex relocatable-blob PHY format.
     //
-    // studiomdl writes Source Engine format (16-byte header):
-    //   int size=16, int id=0, int solidCount, int checkSum
-    //   then per solid: int solidSize, char[4] "VPHY", ... IVP data ...
-    //   then keyvalue text at the end
+    // Source Engine produces IVP compact-surface collision data which is
+    // incompatible with Apex's native physics geometry format.  We
+    // deserialise each CPhysCollide, extract polyhedron data via
+    // IPhysicsCollision, and repack as an Apex relocatable blob (id >= 1).
     //
-    // Apex expects IVPS format (20-byte header):
-    //   int size=20, int id=1, int solidCount, int checkSum, int keyValuesOffset
-    //   then immediately: IVP data (same bytes, no VPHY prefix)
-    //   then keyvalue text
+    // Apex .phy file layout:
+    //   [20-byte IVPS header]  { size=20, id>=1, solidCount, checkSum, kvOffset }
+    //   [relocatable blob]     self-relative pointers, fixed up by loader
+    //   [key-value text]       Source-style physics properties
     //
-    // The actual collision geometry (IVP/SOLEX) is identical between formats.
-    // Only the header and the 8-byte "solidSize+VPHY" per-solid prefix differ.
+    // Blob layout (all offsets relative to blob start):
+    //   BlobHeader (32 B)  →  Solid[] (144 B each)  →  Convex[] (64 B each)
+    //   →  vertex data (float[3] per vert)
+    //   →  face data   (32 B per face, byte vertex indices, 0xFF pad)
+    //   →  edge data   (4 B per edge: u8 v0, u8 v1, u8 faceA, u8 faceB)
     //-----------------------------------------------------------------------
     {
+        extern IPhysicsCollision* physcollision;
+
         DWORD attr = GetFileAttributesA(phySrc.c_str());
         if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY))
         {
-            // Read studiomdl-generated phy
+            printf("  [PHY] Found source: %s\n", phySrc.c_str());
             FILE* phyIn = fopen(phySrc.c_str(), "rb");
             if (phyIn)
             {
@@ -2561,56 +2570,359 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
                 fclose(phyIn);
                 remove(phySrc.c_str());
 
-                // Parse Source Engine phyheader_t (16 bytes)
-                // struct { int size; int id; int solidCount; int checkSum; }
+                // --- Parse Source phyheader_t (16-byte) ---
+                int srcHdrSize = *reinterpret_cast<int*>(phyBuf + 0);
                 int srcSolidCount = *reinterpret_cast<int*>(phyBuf + 8);
 
-                // After the 16-byte header, each solid is: int solidSize + solidSize bytes of data.
-                // The first 4 bytes of that data are the "VPHY" magic — skip them too.
-                // So actual IVP data starts at: 16 + 4(solidSize) + 4(VPHY) = offset 24.
-                // solidSize includes the VPHY magic, so actual IVP size = solidSize - 4.
-                int srcSolidSize = *reinterpret_cast<int*>(phyBuf + 16);  // per-solid byte count
-                int ivpDataSize  = srcSolidSize - 4;                       // skip "VPHY" magic
-                const char* ivpData = phyBuf + 16 + 4 + 4;               // skip solidSize(4) + VPHY(4)
+                // Walk solids to find key-value text boundary.
+                long cursor = srcHdrSize;
+                for (int i = 0; i < srcSolidCount; i++)
+                {
+                    if (cursor + 4 > phyFileSize) break;
+                    int solidSize = *reinterpret_cast<int*>(phyBuf + cursor);
+                    cursor += 4 + solidSize;
+                }
+                long kvStart = cursor;
+                long kvSize = phyFileSize - kvStart;
+                if (kvSize < 0) kvSize = 0;
 
-                // Keyvalue text follows immediately after the solid(s).
-                // For single-solid models: keyvalue starts at 16 + 4 + srcSolidSize
-                long kvStart    = 16 + 4 + srcSolidSize;
-                long kvSize     = phyFileSize - kvStart;
-                const char* kvData = phyBuf + kvStart;
+                // ---------------------------------------------------------------
+                // Deserialise each solid's collision data into CPhysCollide
+                // objects, extract convex polyhedron geometry, and build the
+                // Apex relocatable blob.
+                // ---------------------------------------------------------------
 
-                // Build Apex IVPS header (20 bytes).
-                // keyValuesOffset = distance from start of IVPS header to keyvalue text
-                //                 = 20 (header) + ivpDataSize
-                int keyValuesOffset = 20 + ivpDataSize;
+                // --- Collect per-solid / per-convex / raw geometry data ---
+                struct ConvexData {
+                    std::vector<Vector>                       verts;
+                    std::vector<std::vector<uint8_t>>         faces;     // per face: vertex indices
+                    struct Edge { uint8_t v[4]; };             // {v0,v1,faceA,faceB}
+                    std::vector<Edge>                         edges;
+                    float center[3];
+                    float inradius;
+                };
+                struct SolidData {
+                    std::vector<ConvexData> convexes;
+                    Vector aabbMins, aabbMaxs;
+                    Vector massCenter;
+                    float  volume;
+                };
+                std::vector<SolidData> solids;
 
+                long solidCursor = srcHdrSize;
+                for (int si = 0; si < srcSolidCount; si++)
+                {
+                    if (solidCursor + 4 > phyFileSize) break;
+                    int solidSize = *reinterpret_cast<int*>(phyBuf + solidCursor);
+                    char* solidBuf = phyBuf + solidCursor + 4;
+                    solidCursor += 4 + solidSize;
+
+                    CPhysCollide* pCollide = physcollision->UnserializeCollide(
+                        solidBuf, solidSize, si);
+                    if (!pCollide) {
+                        printf("  [PHY] WARNING: UnserializeCollide failed for solid %d\n", si);
+                        continue;
+                    }
+
+                    SolidData sd;
+                    sd.volume = physcollision->CollideVolume(pCollide);
+                    physcollision->CollideGetMassCenter(pCollide, &sd.massCenter);
+                    physcollision->CollideGetAABB(&sd.aabbMins, &sd.aabbMaxs,
+                        pCollide, vec3_origin, vec3_angle);
+
+                    // Extract convex pieces.
+                    const int kMaxConvexes = 256;
+                    CPhysConvex* convexArray[kMaxConvexes];
+                    int numConvex = physcollision->GetConvexesUsedInCollideable(
+                        pCollide, convexArray, kMaxConvexes);
+
+                    for (int ci = 0; ci < numConvex; ci++)
+                    {
+                        CPolyhedron* poly = physcollision->PolyhedronFromConvex(
+                            convexArray[ci], false);
+                        if (!poly || poly->iVertexCount == 0) {
+                            printf("  [PHY] WARNING: PolyhedronFromConvex returned "
+                                "null/empty for solid %d convex %d\n", si, ci);
+                            if (poly) poly->Release();
+                            continue;
+                        }
+
+                        ConvexData cd;
+
+                        // --- Vertices ---
+                        for (int vi = 0; vi < poly->iVertexCount; vi++)
+                            cd.verts.push_back(poly->pVertices[vi]);
+
+                        // --- Faces (polygon vertex indices from line refs) ---
+                        for (int fi = 0; fi < poly->iPolygonCount; fi++)
+                        {
+                            const Polyhedron_IndexedPolygon_t& pg = poly->pPolygons[fi];
+                            std::vector<uint8_t> faceVerts;
+                            for (int ri = 0; ri < pg.iIndexCount; ri++)
+                            {
+                                const Polyhedron_IndexedLineReference_t& ref =
+                                    poly->pIndices[pg.iFirstIndex + ri];
+                                const Polyhedron_IndexedLine_t& line =
+                                    poly->pLines[ref.iLineIndex];
+                                faceVerts.push_back(
+                                    (uint8_t)line.iPointIndices[ref.iEndPointIndex]);
+                            }
+                            cd.faces.push_back(std::move(faceVerts));
+                        }
+
+                        // --- Edges → {v0, v1, faceA, faceB} ---
+                        // Build edge-to-face map: each line is shared by 2 faces.
+                        std::vector<uint8_t> lineFaceA(poly->iLineCount, 0xFF);
+                        std::vector<uint8_t> lineFaceB(poly->iLineCount, 0xFF);
+                        for (int fi = 0; fi < poly->iPolygonCount; fi++)
+                        {
+                            const Polyhedron_IndexedPolygon_t& pg = poly->pPolygons[fi];
+                            for (int ri = 0; ri < pg.iIndexCount; ri++)
+                            {
+                                unsigned short li =
+                                    poly->pIndices[pg.iFirstIndex + ri].iLineIndex;
+                                if (lineFaceA[li] == 0xFF)
+                                    lineFaceA[li] = (uint8_t)fi;
+                                else
+                                    lineFaceB[li] = (uint8_t)fi;
+                            }
+                        }
+                        for (int li = 0; li < poly->iLineCount; li++)
+                        {
+                            ConvexData::Edge e;
+                            e.v[0] = (uint8_t)poly->pLines[li].iPointIndices[0];
+                            e.v[1] = (uint8_t)poly->pLines[li].iPointIndices[1];
+                            e.v[2] = lineFaceA[li];
+                            e.v[3] = lineFaceB[li];
+                            cd.edges.push_back(e);
+                        }
+
+                        // --- Convex center & inradius ---
+                        Vector cvxMins = cd.verts[0], cvxMaxs = cd.verts[0];
+                        for (size_t vi = 1; vi < cd.verts.size(); vi++) {
+                            VectorMin(cd.verts[vi], cvxMins, cvxMins);
+                            VectorMax(cd.verts[vi], cvxMaxs, cvxMaxs);
+                        }
+                        cd.center[0] = (cvxMins.x + cvxMaxs.x) * 0.5f;
+                        cd.center[1] = (cvxMins.y + cvxMaxs.y) * 0.5f;
+                        cd.center[2] = (cvxMins.z + cvxMaxs.z) * 0.5f;
+                        float hx = (cvxMaxs.x - cvxMins.x) * 0.5f;
+                        float hy = (cvxMaxs.y - cvxMins.y) * 0.5f;
+                        float hz = (cvxMaxs.z - cvxMins.z) * 0.5f;
+                        cd.inradius = hx;
+                        if (hy < cd.inradius) cd.inradius = hy;
+                        if (hz < cd.inradius) cd.inradius = hz;
+
+                        poly->Release();
+                        sd.convexes.push_back(std::move(cd));
+                    }
+
+                    physcollision->DestroyCollide(pCollide);
+                    solids.push_back(std::move(sd));
+                }
+
+                // ---------------------------------------------------------------
+                // Build the relocatable blob.
+                // Layout: BlobHeader → Solid[] → Convex[] → vertex/face/edge data
+                // ---------------------------------------------------------------
+                const int BLOB_HDR = 32;
+                const int SOLID_SZ = 144;
+                const int CONVEX_SZ = 64;
+
+                int totalConvex = 0;
+                for (auto& s : solids)
+                    totalConvex += (int)s.convexes.size();
+
+                // Phase 1: calculate offsets for each data block.
+                int solidArrayOff = BLOB_HDR;
+                int convexArrayOff = solidArrayOff + SOLID_SZ * (int)solids.size();
+                int dataOff = convexArrayOff + CONVEX_SZ * totalConvex;
+
+                // Per-convex data offsets.
+                struct ConvexOffsets { int verts, faces, edges; };
+                std::vector<ConvexOffsets> cvxOffsets;
+                for (auto& s : solids) {
+                    for (auto& c : s.convexes) {
+                        ConvexOffsets co;
+                        co.verts = dataOff;
+                        dataOff += (int)c.verts.size() * 12; // 3 floats
+                        co.faces = dataOff;
+                        dataOff += (int)c.faces.size() * 32; // 32 B per face
+                        co.edges = dataOff;
+                        dataOff += (int)c.edges.size() * 4;  // 4 B per edge
+                        cvxOffsets.push_back(co);
+                    }
+                }
+                int totalBlobSize = dataOff;
+
+                // Phase 2: allocate and fill the blob.
+                std::vector<uint8_t> blob(totalBlobSize, 0);
+
+                // -- Blob header (32 bytes) --
+                *reinterpret_cast<int64_t*>(&blob[0]) = solidArrayOff; // relptr
+                *reinterpret_cast<int32_t*>(&blob[8]) = (int)solids.size();
+                *reinterpret_cast<int32_t*>(&blob[24]) = totalBlobSize;
+
+                // -- Solid entries --
+                int cvxIdx = 0;
+                int curConvexOff = convexArrayOff;
+                for (int si = 0; si < (int)solids.size(); si++)
+                {
+                    uint8_t* sp = &blob[solidArrayOff + si * SOLID_SZ];
+                    SolidData& sd = solids[si];
+
+                    // +0: relptr to convex array
+                    *reinterpret_cast<int64_t*>(sp + 0) = curConvexOff;
+                    // +8: numConvexes
+                    *reinterpret_cast<int32_t*>(sp + 8) = (int)sd.convexes.size();
+                    // +16: scale = 1.0f
+                    *reinterpret_cast<float*>(sp + 16) = 1.0f;
+                    // +32: volume center (geometric center of AABB)
+                    float vc[3] = {
+                        (sd.aabbMins.x + sd.aabbMaxs.x) * 0.5f,
+                        (sd.aabbMins.y + sd.aabbMaxs.y) * 0.5f,
+                        (sd.aabbMins.z + sd.aabbMaxs.z) * 0.5f
+                    };
+                    memcpy(sp + 32, vc, 12);
+                    // +48: approximate inertia tensor (diagonal, box approx)
+                    float dx = sd.aabbMaxs.x - sd.aabbMins.x;
+                    float dy = sd.aabbMaxs.y - sd.aabbMins.y;
+                    float dz = sd.aabbMaxs.z - sd.aabbMins.z;
+                    float vf = (sd.volume > 0) ? sd.volume : (dx * dy * dz);
+                    float c12 = vf / 12.0f;
+                    float Ixx = c12 * (dy * dy + dz * dz);
+                    float Iyy = c12 * (dx * dx + dz * dz);
+                    float Izz = c12 * (dx * dx + dy * dy);
+                    *reinterpret_cast<float*>(sp + 48) = Ixx;
+                    *reinterpret_cast<float*>(sp + 64) = Iyy;
+                    *reinterpret_cast<float*>(sp + 80) = Izz;
+                    // off-diagonal = 0 (already zeroed)
+
+                    // +96: center of mass
+                    *reinterpret_cast<float*>(sp + 96) = sd.massCenter.x;
+                    *reinterpret_cast<float*>(sp + 100) = sd.massCenter.y;
+                    *reinterpret_cast<float*>(sp + 104) = sd.massCenter.z;
+                    // +108: reserved (0)
+                    // +112: AABB mins
+                    *reinterpret_cast<float*>(sp + 112) = sd.aabbMins.x;
+                    *reinterpret_cast<float*>(sp + 116) = sd.aabbMins.y;
+                    *reinterpret_cast<float*>(sp + 120) = sd.aabbMins.z;
+                    // +124: AABB maxs
+                    *reinterpret_cast<float*>(sp + 124) = sd.aabbMaxs.x;
+                    *reinterpret_cast<float*>(sp + 128) = sd.aabbMaxs.y;
+                    *reinterpret_cast<float*>(sp + 132) = sd.aabbMaxs.z;
+
+                    curConvexOff += CONVEX_SZ * (int)sd.convexes.size();
+
+                    // -- Convex entries --
+                    for (int ci = 0; ci < (int)sd.convexes.size(); ci++, cvxIdx++)
+                    {
+                        int cOff = convexArrayOff + cvxIdx * CONVEX_SZ;
+                        uint8_t* cp = &blob[cOff];
+                        ConvexData& cd = sd.convexes[ci];
+                        ConvexOffsets& co = cvxOffsets[cvxIdx];
+
+                        // +0..15: convex center + inradius
+                        *reinterpret_cast<float*>(cp + 0) = cd.center[0];
+                        *reinterpret_cast<float*>(cp + 4) = cd.center[1];
+                        *reinterpret_cast<float*>(cp + 8) = cd.center[2];
+                        *reinterpret_cast<float*>(cp + 12) = cd.inradius;
+                        // +16: relptr to vertex list
+                        *reinterpret_cast<int64_t*>(cp + 16) = co.verts;
+                        *reinterpret_cast<int32_t*>(cp + 24) = (int)cd.verts.size();
+                        // +32: relptr to face-vert list
+                        *reinterpret_cast<int64_t*>(cp + 32) = co.faces;
+                        *reinterpret_cast<int32_t*>(cp + 40) = (int)cd.faces.size();
+                        // +48: relptr to edge list
+                        *reinterpret_cast<int64_t*>(cp + 48) = co.edges;
+                        *reinterpret_cast<int32_t*>(cp + 56) = (int)cd.edges.size();
+
+                        // --- Write vertex data ---
+                        for (int vi = 0; vi < (int)cd.verts.size(); vi++)
+                        {
+                            float* dst = reinterpret_cast<float*>(&blob[co.verts + vi * 12]);
+                            dst[0] = cd.verts[vi].x;
+                            dst[1] = cd.verts[vi].y;
+                            dst[2] = cd.verts[vi].z;
+                        }
+
+                        // --- Write face data (32 bytes each, 0xFF pad) ---
+                        for (int fi = 0; fi < (int)cd.faces.size(); fi++)
+                        {
+                            uint8_t* fp = &blob[co.faces + fi * 32];
+                            memset(fp, 0xFF, 32);
+                            int n = (int)cd.faces[fi].size();
+                            if (n > 32) n = 32;
+                            for (int k = 0; k < n; k++)
+                                fp[k] = cd.faces[fi][k];
+                        }
+
+                        // --- Write edge data (4 bytes each) ---
+                        for (int ei = 0; ei < (int)cd.edges.size(); ei++)
+                        {
+                            uint8_t* ep = &blob[co.edges + ei * 4];
+                            ep[0] = cd.edges[ei].v[0];
+                            ep[1] = cd.edges[ei].v[1];
+                            ep[2] = cd.edges[ei].v[2];
+                            ep[3] = cd.edges[ei].v[3];
+                        }
+                    }
+                }
+
+                // ---------------------------------------------------------------
+                // Write the Apex .phy file:  IVPS header + blob + keyvalues
+                // ---------------------------------------------------------------
                 struct IVPSHeader {
                     int size;            // 20
-                    int id;              // 1
+                    int id;              // >= 1 → relocatable blob path
                     int solidCount;
                     int checkSum;
-                    int keyValuesOffset;
+                    int keyValuesOffset; // from file start
                 };
                 IVPSHeader ivpsHdr;
-                ivpsHdr.size            = 20;
-                ivpsHdr.id              = 1;
-                ivpsHdr.solidCount      = srcSolidCount;
-                ivpsHdr.checkSum        = s_pHdr->checksum;
-                ivpsHdr.keyValuesOffset = keyValuesOffset;
+                ivpsHdr.size = 20;
+                ivpsHdr.id = 1;
+                ivpsHdr.solidCount = (int)solids.size();
+                ivpsHdr.checkSum = savedChecksum;
+                ivpsHdr.keyValuesOffset = 20 + totalBlobSize;
 
                 FILE* phyOut = fopen(phyDst.c_str(), "wb");
                 if (phyOut)
                 {
                     fwrite(&ivpsHdr, sizeof(IVPSHeader), 1, phyOut);
-                    fwrite(ivpData, 1, ivpDataSize, phyOut);
-                    if (kvSize > 0) fwrite(kvData, 1, kvSize, phyOut);
+                    fwrite(blob.data(), 1, totalBlobSize, phyOut);
+                    if (kvSize > 0)
+                        fwrite(phyBuf + kvStart, 1, kvSize, phyOut);
                     fclose(phyOut);
-                    printf("  [PHY] Converted to Apex IVPS format: %s\n", phyDst.c_str());
+
+                    // Patch the already-written RMDL header on disk:
+                    // set phySize so the mod loader knows to load the .phy file.
+                    // Note: do NOT set STUDIOHDR_FLAGS_HAS_PHYSICS_DATA (0x40000) —
+                    // that flag is for pak-embedded physics only. For separate .phy
+                    // files, phySize > 0 is sufficient (verified against reference
+                    // models like slumcity_fencewall which have phySize set but no
+                    // 0x40000 flag).
+                    {
+                        int phyFileSize = (int)(sizeof(IVPSHeader) + totalBlobSize + kvSize);
+                        FILE* rmdlPatch = fopen(rmdlPath.c_str(), "r+b");
+                        if (rmdlPatch)
+                        {
+                            fseek(rmdlPatch, offsetof(r5_studiohdr_t, phySize), SEEK_SET);
+                            fwrite(&phyFileSize, sizeof(int), 1, rmdlPatch);
+                            fclose(rmdlPatch);
+                            printf("  [PHY] Patched RMDL: phySize=%d\n", phyFileSize);
+                        }
+                    }
+
+                    printf("  [PHY] Written Apex relocatable blob: %s "
+                        "(%d solid(s), %d convex(es), %d bytes)\n",
+                        phyDst.c_str(), (int)solids.size(), totalConvex,
+                        totalBlobSize);
                 }
                 else
                 {
                     printf("  [PHY] WARNING: could not write '%s' (error %lu)\n",
-                           phyDst.c_str(), GetLastError());
+                        phyDst.c_str(), GetLastError());
                 }
 
                 delete[] phyBuf;
@@ -2619,6 +2931,11 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
             {
                 printf("  [PHY] WARNING: could not read '%s'\n", phySrc.c_str());
             }
+        }
+        else
+        {
+            printf("  [PHY] No source .phy found at '%s' (model has no "
+                "$collisionmodel?)\n", phySrc.c_str());
         }
     }
 
@@ -2653,8 +2970,8 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
             cleanDir = (slash != std::string::npos) ? phySrc.substr(0, slash) : "";
         }
         while (!cleanDir.empty() &&
-               cleanDir.size() >= modelsRoot.size() &&
-               _strnicmp(cleanDir.c_str(), gamedirStr.c_str(), gamedirStr.size()) == 0)
+            cleanDir.size() >= modelsRoot.size() &&
+            _strnicmp(cleanDir.c_str(), gamedirStr.c_str(), gamedirStr.size()) == 0)
         {
             if (!RemoveDirectoryA(cleanDir.c_str()))
                 break;  // directory not empty or already gone — stop

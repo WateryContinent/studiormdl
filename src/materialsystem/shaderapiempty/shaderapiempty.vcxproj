@@ -65,7 +65,8 @@
       <NoDefaultLibs>libc;libcd;libcmtd</NoDefaultLibs>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y "$(OutDir)shaderapiempty.dll" "$(SolutionDir)bin\shaderapiempty.dll"</Command>
+      <Command>if not exist "$(SolutionDir)bin" mkdir "$(SolutionDir)bin"
+copy /y "$(OutDir)shaderapiempty.dll" "$(SolutionDir)bin\shaderapiempty.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -93,7 +94,8 @@
       <NoDefaultLibs>libc;libcd;libcmt</NoDefaultLibs>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y "$(OutDir)shaderapiempty.dll" "$(SolutionDir)bin\shaderapiempty.dll"</Command>
+      <Command>if not exist "$(SolutionDir)bin" mkdir "$(SolutionDir)bin"
+copy /y "$(OutDir)shaderapiempty.dll" "$(SolutionDir)bin\shaderapiempty.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
