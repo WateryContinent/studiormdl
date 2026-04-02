@@ -1536,9 +1536,10 @@ static void R5_WriteDefaultSequence()
     s_pHdr->numlocalseq   = 1;
 
     pSeq->baseptr   = 0;
-    R5_AddToStringTable((char*)pSeq, &pSeq->szlabelindex, "ref");
+    R5_AddToStringTable((char*)pSeq, &pSeq->szlabelindex, "@ref");
     R5_AddToStringTable((char*)pSeq, &pSeq->szactivitynameindex, "");
 
+    pSeq->flags          = 0x80000;
     pSeq->activity       = -1;
     pSeq->bbmin          = s_pHdr->hull_min;
     pSeq->bbmax          = s_pHdr->hull_max;
@@ -1565,6 +1566,11 @@ static void R5_WriteDefaultSequence()
 
     pSeq->animindexindex = (int)(s_pData - (char*)pSeq);
 
+    // Empty arrays (iklockindex, keyvalueindex, activitymodifierindex) point here too
+    pSeq->iklockindex              = pSeq->animindexindex;
+    pSeq->keyvalueindex            = pSeq->animindexindex;
+    pSeq->activitymodifierindex    = pSeq->animindexindex;
+
     // Blend index (points to animdesc)
     int blendRef = pSeq->animindexindex + (int)sizeof(int);
     memcpy(s_pData, &blendRef, sizeof(int));
@@ -1574,11 +1580,16 @@ static void R5_WriteDefaultSequence()
     r5_mstudioanimdesc_t* pAnim = reinterpret_cast<r5_mstudioanimdesc_t*>(s_pData);
     memset(pAnim, 0, sizeof(r5_mstudioanimdesc_t));
 
-    R5_AddToStringTable((char*)pAnim, &pAnim->sznameindex, "@ref");
-    pAnim->fps   = 30.0f;
-    pAnim->flags = 0x0020; // STUDIO_ALLZEROS
+    R5_AddToStringTable((char*)pAnim, &pAnim->sznameindex, "");
+    pAnim->fps       = 30.0f;
+    pAnim->flags     = 0x20000; // RMDL v54 ALLZEROS flag
+    pAnim->numframes = 1;
 
     s_pData += sizeof(r5_mstudioanimdesc_t);
+
+    // Record total block size in unused[0] (seqdesc start to end of seq data)
+    pSeq->unused[0] = (int)(s_pData - (char*)pSeq);
+
     R5_AlignData(s_pData);
 }
 
@@ -1920,7 +1931,6 @@ static void R5_WriteKeyValues()
 
 static void R5_ConvertSrcBoneTransforms(const studiohdr_t* pOld)
 {
-    if (!pOld->studiohdr2index) return;
     const studiohdr2_t* pHdr2 = pOld->pStudioHdr2();
     int num = pHdr2->numsrcbonetransform;
     if (num <= 0) return;
@@ -1952,7 +1962,6 @@ static void R5_ConvertSrcBoneTransforms(const studiohdr_t* pOld)
 
 static void R5_ConvertLinearBones(const studiohdr_t* pOld)
 {
-    if (!pOld->studiohdr2index) return;
     const studiohdr2_t* pHdr2 = pOld->pStudioHdr2();
     if (!pHdr2->linearboneindex || pOld->numbones <= 1)
         return;
@@ -2435,7 +2444,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     s_pHdr->numlocalattachments = pOldHdr->numlocalattachments;
     s_pHdr->keyvaluesize   = pOldHdr->keyvaluesize;
     s_pHdr->numincludemodels = -1;
-    s_pHdr->numsrcbonetransform = pOldHdr->studiohdr2index ? pOldHdr->pStudioHdr2()->numsrcbonetransform : 0;
+    s_pHdr->numsrcbonetransform = pOldHdr->pStudioHdr2()->numsrcbonetransform;
     s_pHdr->mass           = pOldHdr->mass;
     s_pHdr->contents       = pOldHdr->contents;
     s_pHdr->constdirectionallightdot = pOldHdr->constdirectionallightdot;
@@ -2523,6 +2532,47 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     else
     {
         printf("ERROR: Could not write RMDL '%s'\n", rmdlPath.c_str());
+    }
+
+    //-----------------------------------------------------------------------
+    // Write .rson file (RMDL → RRIG linkage)
+    // Only generated when -convertanims produced a .rrig.
+    // Format: LF line endings, TAB-indented paths with backslashes.
+    //-----------------------------------------------------------------------
+    if (s_bConvertAnims)
+    {
+        std::string rsonPath    = R5_ReplaceExt(rmdlPath, ".rson");
+
+        // Build RRIG relative path matching animconv logic:
+        // animconv replaces a leading "mdl" prefix with "animrig" in
+        // the MDL header name.  relStem may start with "mdl\" when
+        // $modelname includes the mdl/ prefix, so mirror that transform.
+        std::string rrigRelPath = relStem;
+        if (rrigRelPath.size() >= 4 &&
+            (_strnicmp(rrigRelPath.c_str(), "mdl\\", 4) == 0 ||
+             _strnicmp(rrigRelPath.c_str(), "mdl/", 4) == 0))
+        {
+            rrigRelPath = "animrig" + rrigRelPath.substr(3);
+        }
+        else
+        {
+            rrigRelPath = "animrig\\" + rrigRelPath;
+        }
+        rrigRelPath += ".rrig";
+
+        FILE* rsonOut = fopen(rsonPath.c_str(), "wb");
+        if (rsonOut)
+        {
+            fprintf(rsonOut, "rigs:\n[\n\t%s\n]\nseqs:\n[\n]\n",
+                    rrigRelPath.c_str());
+            fclose(rsonOut);
+            printf("  [RMDL] Written .rson: %s\n", rsonPath.c_str());
+        }
+        else
+        {
+            printf("  [RMDL] WARNING: could not write .rson '%s'\n",
+                   rsonPath.c_str());
+        }
     }
 
     //-----------------------------------------------------------------------

@@ -291,6 +291,9 @@ void Grab_Triangles( s_source_t *psource )
 
 	vmin[0] = vmin[1] = vmin[2] = 99999;
 	vmax[0] = vmax[1] = vmax[2] = -99999;
+
+	g_numfaces = 0;
+	g_numvlist = 0;
  
 	//
 	// load the base triangles
@@ -382,6 +385,8 @@ void Grab_Triangles( s_source_t *psource )
 			g_numtexcoords[i] = g_numvlist;
 		}
 	}
+
+	BuildIndividualMeshes( psource );
 }
 
 
@@ -444,8 +449,6 @@ int Load_SMD ( s_source_t *psource )
 		{
 			MdlWarning("unknown studio command \"%s\"\n", cmd );
 		}
-
-		BuildIndividualMeshes( psource );
 	}
 	fclose( g_fpInput );
 

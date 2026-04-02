@@ -11958,7 +11958,7 @@ void CStudioMDLApp::PostShutdown()
 bool CStudioMDLApp::ParseArguments()
 {
 	g_currentscale = g_defaultscale = 1.0;
-	g_defaultrotation = RadianEuler( 0, 0, M_PI / 2 );
+	g_defaultrotation = RadianEuler( 0, 0, 0 );
 
 	// skip weightlist 0
 	g_numweightlist = 1;
