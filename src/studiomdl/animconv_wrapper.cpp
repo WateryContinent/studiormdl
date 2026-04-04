@@ -166,4 +166,32 @@ void R5_ConvertMDLAnimations(const char* mdl_path,
     jsonFile << "\n    }\n";
     jsonFile.close();
     printf("[animconv] RePak entries written to '%s'\n", jsonPath.c_str());
+
+    // ------------------------------------------------------------------
+    // Write RRIG .rson — lists the sequences belonging to this rig.
+    // Goes next to the .rrig file (same directory, same stem, .rson ext).
+    // Format uses LF line endings, TAB indentation, backslash paths.
+    // ------------------------------------------------------------------
+    {
+        std::string rsonName = rrigFsPath.stem().string() + ".rson";
+        std::string rsonPath = jsonDir + "\\" + rsonName;
+
+        // Use binary mode to ensure LF-only line endings on Windows.
+        std::ofstream rsonFile(rsonPath, std::ios::out | std::ios::binary);
+        if (rsonFile.is_open()) {
+            rsonFile << "seqs:\n[\n";
+            for (const auto& rseqPath : rig.rseqpaths) {
+                std::string p = rseqPath;
+                std::replace(p.begin(), p.end(), '/', '\\');
+                rsonFile << "\t" << p << "\n";
+            }
+            rsonFile << "]\n";
+            rsonFile.close();
+            printf("[animconv] Written RRIG .rson: %s\n", rsonPath.c_str());
+        }
+        else {
+            printf("[animconv] WARNING: could not write RRIG .rson '%s'\n",
+                   rsonPath.c_str());
+        }
+    }
 }

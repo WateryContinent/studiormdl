@@ -66,25 +66,23 @@ void ParseMDL_v49(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 	}
 
 	// hitboxsets
-	rig.hitboxsets.resize(1);
-	rig.hitboxsets[0].name = "default";
-	/*rig.hitboxsets.resize(pMdlHdr->numhitboxsets);
+	rig.hitboxsets.resize(pMdlHdr->numhitboxsets);
 	auto* pHitboxsets = PTR_FROM_IDX(p2::mstudiohitboxset_t, buffer, pMdlHdr->hitboxsetindex);
 	for (int i = 0; i < pMdlHdr->numhitboxsets; i++) {
 		rig.hitboxsets[i].name = STRING_FROM_IDX(&pHitboxsets[i], pHitboxsets[i].sznameindex);
+		auto* pHitbox = PTR_FROM_IDX(p2::mstudiobbox_t, &pHitboxsets[i], pHitboxsets[i].hitboxindex);
 		for (int j = 0; j < pHitboxsets[i].numhitboxes; j++) {
-			auto* pHitbox = PTR_FROM_IDX(p2::mstudiobbox_t, &pHitboxsets[i], pHitboxsets[i].hitboxindex);
 			temp::bbox_t hitbox{};
 			hitbox.name = STRING_FROM_IDX(&pHitbox[j], pHitbox[j].szhitboxnameindex);
-			hitbox.hitdataGroupOffset = STRING_FROM_IDX(&pHitbox[j], pHitbox[j].szhitboxnameindex);
+			hitbox.hitdataGroupOffset = "";
 			hitbox.bone = pHitbox[j].bone;
 			hitbox.group = pHitbox[j].group;
 			hitbox.bbmin = pHitbox[j].bbmin;
 			hitbox.bbmax = pHitbox[j].bbmax;
-			//hitbox.critShotOverride = pHitbox[j].critShotOverride;
+			hitbox.critShotOverride = 0;
 			rig.hitboxsets[i].hitboxes.push_back(hitbox);
 		}
-	}*/
+	}
 
 	// nodes
 	int* pNodenames = reinterpret_cast<int*>(buffer + pMdlHdr->localnodenameindex);
@@ -140,13 +138,13 @@ void ParseMDL_v49(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 		std::string seq_dir, seqdescname;
 		std::string raw_seq_name = STRING_FROM_IDX(pSeqBase, seqDesc->sznameindex);
 		std::replace(raw_seq_name.begin(), raw_seq_name.end(), '\\', '/');
-		std::replace(override_rseq_path.begin(), override_rseq_path.end(), '/', '\\');
+		std::replace(override_rseq_path.begin(), override_rseq_path.end(), '\\', '/');
 		std::string seq_name = (raw_seq_name.rfind('/') != std::string::npos) ? raw_seq_name.substr(raw_seq_name.rfind('/') + 1, raw_seq_name.size()) + ".rseq" : raw_seq_name + ".rseq";
 
 		// override path
 		if (!override_rseq_path.empty()) {
 			seq_dir = override_rseq_path;
-			seqdescname = override_rseq_path + (override_rseq_path.back() == '\\' ? "" : "\\") + seq_name;
+			seqdescname = override_rseq_path + (override_rseq_path.back() == '/' ? "" : "/") + seq_name;
 		}
 		else {
 			seq_dir = (raw_seq_name.rfind('/') != std::string::npos) ? raw_seq_name.substr(0, raw_seq_name.rfind('/')) + '/' : "";
@@ -159,7 +157,7 @@ void ParseMDL_v49(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 		temp::Sequence seq(seqdescname, pMdlHdr->numbones);
 		seq.anims.reserve(24);
 		seq.path = output_dir + "/" + seqdescname;
-		seq.flags = seqDesc->flags;
+		seq.flags = (seqDesc->flags & 0x20 ? 0x0 : 0x20000) | (seqDesc->flags & ~0x20);
 		seq.activityname = STRING_FROM_IDX(pSeqBase, seqDesc->szactivitynameindex);
 		seq.activity = seqDesc->activity;
 		seq.actweight = seqDesc->actweight;
@@ -225,7 +223,7 @@ void ParseMDL_v49(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 				std::replace(n.begin(), n.end(), '\\', '/');
 				if (!override_rseq_path.empty()) {
 					n = n.substr(n.find_last_of('/') + 1);
-					n = override_rseq_path + (override_rseq_path.back() == '\\' ? "" : "\\") + n;
+					n = override_rseq_path + (override_rseq_path.back() == '/' ? "" : "/") + n;
 				}
 				std::replace(n.begin(), n.end(), '\\', '/');
 				autolayer.guidSequence = StringToGuid(n.c_str());
@@ -375,9 +373,96 @@ void ParseMDL_v49(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 				sectionbaseframe += sectionframes;
 			}
 
-			//TODO:
-			//ikrules
-			//movements
+			// ikrules
+			if (animDesc->numikrules && animDesc->ikruleindex) {
+				auto* ikrules = reinterpret_cast<p2::mstudioikrule_t*>((char*)animDesc + animDesc->ikruleindex);
+				for (int i = 0; i < animDesc->numikrules; i++) {
+					temp::ikrule_t ikrule{};
+					ikrule.index = ikrules[i].index;
+					ikrule.type = ikrules[i].type;
+					ikrule.chain = ikrules[i].chain;
+					ikrule.bone = ikrules[i].bone;
+					ikrule.slot = ikrules[i].slot;
+					ikrule.height = ikrules[i].height;
+					ikrule.radius = ikrules[i].radius;
+					ikrule.floor = ikrules[i].floor;
+					ikrule.pos = ikrules[i].pos;
+					ikrule.q = ikrules[i].q;
+					ikrule.iStart = ikrules[i].iStart;
+					ikrule.start = ikrules[i].start;
+					ikrule.peak = ikrules[i].peak;
+					ikrule.tail = ikrules[i].tail;
+					ikrule.end = ikrules[i].end;
+					ikrule.contact = ikrules[i].contact;
+					ikrule.drop = ikrules[i].drop;
+					ikrule.top = ikrules[i].top;
+					ikrule.endHeight = -100.f;
+					if (ikrules[i].szattachmentindex) ikrule.attachmentname = STRING_FROM_IDX(&ikrules[i], ikrules[i].szattachmentindex);
+
+					if (ikrules[i].compressedikerrorindex) {
+						if (ikrules[i].end < ikrules[i].start) ikrules[i].end += 1;
+						int32_t numikframes = static_cast<int32_t>(anim.numframes * (std::min({ ikrules[i].end, 1.f }) - ikrules[i].start));
+						ikrule.ikruledata.resize(anim.numframes);
+
+						auto* frameshdr = reinterpret_cast<r2::mstudiocompressedikerror_t*>((char*)&ikrules[i] + ikrules[i].compressedikerrorindex);
+						for (int frame = 0; frame < numikframes; frame++) {
+							for (int idx = 0; idx < 6; idx++) {
+								ikrule.scale[idx] = frameshdr->posscale[idx];
+								if (frameshdr->offset[idx]) {
+									auto* panimvalue = reinterpret_cast<r5::anim::mstudioanimvalue_t*>((char*)frameshdr + frameshdr->offset[idx]);
+									if (idx < 3)
+										p2::RLE::ExtractAnimValue(frame, panimvalue, frameshdr->posscale[idx], ikrule.ikruledata.pos[ikrules[i].iStart + frame][idx]);
+									else
+										p2::RLE::ExtractAnimValue(frame, panimvalue, frameshdr->rotscale[idx - 3], ikrule.ikruledata.rot[ikrules[i].iStart + frame][idx - 3]);
+								}
+							}
+						}
+						ikrule.sectionframes = animDesc->sectionframes ? std::max({ animDesc->sectionframes, std::min({ animDesc->numframes, 0xFE }) }) : animDesc->numframes;
+					}
+					anim.ikrules.push_back(ikrule);
+				}
+			}
+
+			// movements
+			if (animDesc->nummovements && animDesc->movementindex) {
+				auto* pMovements = PTR_FROM_IDX(p2::mstudiomovement_t, animDesc, animDesc->movementindex);
+				temp::framemovement_t movement{};
+				movement.movementdata.resize(anim.numframes, { 0.f, 0.f, 0.f, 0.f });
+
+				int prevEndFrame = 0;
+				Vector3 prevPos = { 0.f, 0.f, 0.f };
+				float prevYaw = 0.f;
+
+				for (int m = 0; m < animDesc->nummovements; m++) {
+					int curEndFrame = pMovements[m].endframe;
+					Vector3 curPos = pMovements[m].position;
+					float curYaw = pMovements[m].angle;
+
+					int segLength = curEndFrame - prevEndFrame;
+					if (segLength < 1) segLength = 1;
+
+					for (int f = prevEndFrame; f <= curEndFrame && f < anim.numframes; f++) {
+						float t = (float)(f - prevEndFrame) / (float)segLength;
+						movement.movementdata[f][0] = prevPos.x + t * (curPos.x - prevPos.x);
+						movement.movementdata[f][1] = prevPos.y + t * (curPos.y - prevPos.y);
+						movement.movementdata[f][2] = prevPos.z + t * (curPos.z - prevPos.z);
+						movement.movementdata[f][3] = prevYaw + t * (curYaw - prevYaw);
+					}
+
+					prevEndFrame = curEndFrame;
+					prevPos = curPos;
+					prevYaw = curYaw;
+				}
+
+				for (int f = prevEndFrame + 1; f < anim.numframes; f++) {
+					movement.movementdata[f] = { prevPos.x, prevPos.y, prevPos.z, prevYaw };
+				}
+
+				movement.sectionframes = animDesc->sectionframes ? std::max({ animDesc->sectionframes, std::min({ animDesc->numframes, 0xFE }) }) : animDesc->numframes;
+				movement.scale = { 0.003906369f, 0.003906369f, 0.003906369f, 0.003906369f };
+				anim.movement = movement;
+				anim.flags |= r5::ANIM_FRAMEMOVEMENT;
+			}
 
 			seq.anims.push_back(anim);
 		}
@@ -502,13 +587,13 @@ void ParseMDL_v53(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 		std::string seq_dir, seqdescname;
 		std::string raw_seq_name = STRING_FROM_IDX(pSeqBase, seqDesc->szlabelindex);
 		std::replace(raw_seq_name.begin(), raw_seq_name.end(), '\\', '/');
-		std::replace(override_rseq_path.begin(), override_rseq_path.end(), '/', '\\');
+		std::replace(override_rseq_path.begin(), override_rseq_path.end(), '\\', '/');
 		std::string seq_name = (raw_seq_name.rfind('/') != std::string::npos) ? raw_seq_name.substr(raw_seq_name.rfind('/') + 1, raw_seq_name.size()) + ".rseq" : raw_seq_name + ".rseq";
 
 		// override path
 		if (!override_rseq_path.empty()) {
 			seq_dir = override_rseq_path;
-			seqdescname = override_rseq_path + (override_rseq_path.back() == '\\' ? "" : "\\") + seq_name;
+			seqdescname = override_rseq_path + (override_rseq_path.back() == '/' ? "" : "/") + seq_name;
 		}
 		else {
 			seq_dir = (raw_seq_name.rfind('/') != std::string::npos) ? raw_seq_name.substr(0, raw_seq_name.rfind('/')) + '/' : "";
@@ -521,7 +606,7 @@ void ParseMDL_v53(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 		temp::Sequence seq(seqdescname, pMdlHdr->numbones);
 		seq.anims.reserve(24);
 		seq.path = output_dir + "/" + seqdescname;
-		seq.flags = seqDesc->flags;
+		seq.flags = (seqDesc->flags & 0x20 ? 0x0 : 0x20000) | (seqDesc->flags & ~0x20);
 		seq.activityname = STRING_FROM_IDX(pSeqBase, seqDesc->szactivitynameindex);
 		seq.activity = seqDesc->activity;
 		seq.actweight = seqDesc->actweight;
@@ -586,7 +671,7 @@ void ParseMDL_v53(char* buffer, temp::rig_t& rig, std::string output_dir, std::s
 				std::replace(n.begin(), n.end(), '\\', '/');
 				if (!override_rseq_path.empty()) {
 					n = n.substr(n.find_last_of('/') + 1);
-					n = override_rseq_path + (override_rseq_path.back() == '\\' ? "" : "\\") + n;
+					n = override_rseq_path + (override_rseq_path.back() == '/' ? "" : "/") + n;
 				}
 				std::replace(n.begin(), n.end(), '\\', '/');
 				autolayer.guidSequence = StringToGuid(n.c_str());
