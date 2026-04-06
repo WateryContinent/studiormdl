@@ -553,7 +553,12 @@ void WriteRSEQ_v7(temp::rig_t& rig, bool bSkipEvents) {
 						bool bRawscl = allEqualVector(animData.scl, startframe, endframe);
 
 						bool bHasPosData = !bRawpos || (bRawpos && !(animData.pos[startframe].approx_equal({ 0,0,0 })));
-						bool bHasRotData = !bRawrot || (bRawrot && !(animData.rot[startframe].approx_equal(rig.bones[bone].rot)));
+						// Always include rotation for root bones (parent == -1): the game does not fall back
+						// to the RRIG rest pose for bones absent from RSEQ, so root bone rotation must be
+						// explicitly present even when it equals the rest pose.
+						bool bHasRotData = (rig.bones[bone].parent == -1)
+							|| !bRawrot
+							|| (bRawrot && !(animData.rot[startframe].approx_equal(rig.bones[bone].rot)));
 						bool bHasSclData = !bRawscl || (bRawscl && !(animData.scl[startframe].approx_equal({ 0,0,0 })));
 
 						if (!bHasPosData && !bHasRotData && !bHasSclData) {

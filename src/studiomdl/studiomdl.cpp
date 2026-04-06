@@ -3412,10 +3412,10 @@ void AddSrcToSrc( s_source_t *pOrigSource, s_source_t *pAppendSource, matrix3x4_
 			face.a = newSource.AddNewVert( pOrigSource, pOrigSource->face[f].a, nSrcMeshIndex, 0 );
 			face.b = newSource.AddNewVert( pOrigSource, pOrigSource->face[f].b, nSrcMeshIndex, 0 );
 			face.c = newSource.AddNewVert( pOrigSource, pOrigSource->face[f].c, nSrcMeshIndex, 0 );
-			if (  pOrigSource->face[f].d != 0 )
+			if (  pOrigSource->face[f].d != 0xFFFFFFFF )
 				face.d = newSource.AddNewVert( pOrigSource, pOrigSource->face[f].d, nSrcMeshIndex, 0 );
 			else
-				face.d = 0;
+				face.d = 0xFFFFFFFF;
 
 			//if ( newSource.m_mesh[0].numfaces == 0 )
 			//{
@@ -3462,10 +3462,10 @@ void AddSrcToSrc( s_source_t *pOrigSource, s_source_t *pAppendSource, matrix3x4_
 				face.a = newSource.AddNewVert( pAppendSource, pAppendSource->face[f].a, nCurMesh, 0, pOrigSource->numvertices );
 				face.b = newSource.AddNewVert( pAppendSource, pAppendSource->face[f].b, nCurMesh, 0, pOrigSource->numvertices );
 				face.c = newSource.AddNewVert( pAppendSource, pAppendSource->face[f].c, nCurMesh, 0, pOrigSource->numvertices );
-				if (  pAppendSource->face[f].d != 0 )
+				if (  pAppendSource->face[f].d != 0xFFFFFFFF )
 					face.d = newSource.AddNewVert( pAppendSource, pAppendSource->face[f].d, nCurMesh, 0, pOrigSource->numvertices );
 				else
-					face.d = 0;
+					face.d = 0xFFFFFFFF;
 			
 				newSource.m_face.AddToTail( face );
 				newSource.m_mesh[0].numfaces++;
@@ -3546,14 +3546,15 @@ void ClampMaxVerticesPerModel( s_source_t *pOrigSource )
 	int ns = newSource.AddToTail( );
 	newSource[ns].Init( pOrigSource->numvertices );
 
-	for (int m = 0; m < pOrigSource->nummeshes; m++ )
+	for (int mi = 0; mi < pOrigSource->nummeshes; mi++ )
 	{
+		int m = pOrigSource->meshindex[mi];
 		s_mesh_t *pOrigMesh = &pOrigSource->mesh[m];
 
 		for ( int f = pOrigMesh->faceoffset; f < pOrigMesh->faceoffset + pOrigMesh->numfaces; f++ )
 		{
 			// make sure all the total for all the meshes in the model don't go over limit
-			int nVertsInFace = ( pOrigSource->face[f].d == 0 ) ? 3 : 4;
+			int nVertsInFace = ( pOrigSource->face[f].d == 0xFFFFFFFF ) ? 3 : 4;
 			if ( ( newSource[ns].m_vertex.Count() + nVertsInFace ) > g_maxVertexClamp )
 			{
 				// go to the next model
@@ -3566,10 +3567,10 @@ void ClampMaxVerticesPerModel( s_source_t *pOrigSource )
 			face.a = newSource[ns].AddNewVert( pOrigSource, pOrigSource->face[f].a, m, m );
 			face.b = newSource[ns].AddNewVert( pOrigSource, pOrigSource->face[f].b, m, m );
 			face.c = newSource[ns].AddNewVert( pOrigSource, pOrigSource->face[f].c, m, m );
-			if (  pOrigSource->face[f].d != 0 )
+			if (  pOrigSource->face[f].d != 0xFFFFFFFF )
 				face.d = newSource[ns].AddNewVert( pOrigSource, pOrigSource->face[f].d, m, m );
 			else
-				face.d = 0;
+				face.d = 0xFFFFFFFF;
 
 			if (newSource[ns].m_mesh[m].numfaces == 0)
 			{
@@ -3585,6 +3586,10 @@ void ClampMaxVerticesPerModel( s_source_t *pOrigSource )
 	{
 		newSource[n].AddAnimations( pOrigSource );
 		newSource[n].m_nummeshes = pOrigSource->nummeshes;
+		for (int i = 0; i < pOrigSource->nummeshes; i++)
+		{
+			newSource[n].m_meshindex[i] = pOrigSource->meshindex[i];
+		}
 	}
 
 	// copy over new meshes and animations back into initial source
@@ -11958,7 +11963,7 @@ void CStudioMDLApp::PostShutdown()
 bool CStudioMDLApp::ParseArguments()
 {
 	g_currentscale = g_defaultscale = 1.0;
-	g_defaultrotation = RadianEuler( 0, 0, M_PI / 2 );
+	g_defaultrotation = RadianEuler( 0, 0, 0 );
 
 	// skip weightlist 0
 	g_numweightlist = 1;
