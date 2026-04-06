@@ -231,6 +231,7 @@
     <ClInclude Include="studiomdl.h" />
     <ClInclude Include="rmdl_write.h" />
     <ClInclude Include="rui_parse.h" />
+    <ClInclude Include="rmdl_bvh.h" />
     <ClInclude Include="..\public\alignedarray.h" />
     <ClInclude Include="..\public\basehandle.h" />
     <ClInclude Include="..\public\tier0\basetypes.h" />
@@ -326,6 +327,9 @@
     <ClCompile Include="v1support.cpp" />
     <ClCompile Include="write.cpp" />
     <ClCompile Include="rmdl_write.cpp" />
+    <ClCompile Include="rmdl_bvh.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="rui_parse.cpp" />
     <!-- animconv_wrapper + embedded R5-AnimConv source files -->
     <ClCompile Include="animconv_wrapper.cpp">

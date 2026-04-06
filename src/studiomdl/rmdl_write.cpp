@@ -30,6 +30,9 @@
 // RUI mesh support
 #include "rui_parse.h"
 
+// BVH4 collision mesh
+#include "rmdl_bvh.h"
+
 #pragma warning(disable: 4996) // strcpy/sprintf safety
 #pragma warning(disable: 4244) // float/int conversions
 
@@ -2516,6 +2519,26 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     // Write string table
     s_pData = R5_WriteStringTable(s_pData);
     R5_AlignData(s_pData);
+
+    //-----------------------------------------------------------------------
+    // Build and append BVH4 collision data
+    //-----------------------------------------------------------------------
+    if (pOldHdr->numbodyparts > 0)
+    {
+        std::vector<uint8_t> bvhBlob = R5_BuildBVHCollision(pOldHdr, pVTX, pVVD);
+        if (!bvhBlob.empty())
+        {
+            // Align to 64 bytes (collision data uses aligned SIMD loads)
+            R5_AlignData(s_pData, 64);
+
+            int bvhOffset = (int)(s_pData - s_pBase);
+            memcpy(s_pData, bvhBlob.data(), bvhBlob.size());
+            s_pData += bvhBlob.size();
+
+            s_pHdr->bvhOffset = bvhOffset;
+            printf("  [BVH] Written at offset 0x%X (%u bytes)\n", bvhOffset, (unsigned)bvhBlob.size());
+        }
+    }
 
     s_pHdr->length = (int)(s_pData - s_pBase);
 
