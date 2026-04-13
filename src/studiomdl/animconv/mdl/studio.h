@@ -307,6 +307,16 @@ namespace p2 {
 		int32_t szattachmentindex;
 		int32_t unused[7];
 	};
+
+	struct mstudiomovement_t {
+		int32_t endframe;
+		int32_t motionflags;
+		float v0;
+		float v1;
+		float angle;
+		Vector3 vector;
+		Vector3 position;
+	};
 }
 
 namespace r2 {
