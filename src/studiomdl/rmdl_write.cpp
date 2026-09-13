@@ -24,7 +24,7 @@
 #include "vphysics_interface.h"
 #include "mathlib/polyhedron.h"
 
-// R5-AnimConv integration — produces .rrig/.rseq alongside the .rmdl
+// R5-AnimConv integration â€” produces .rrig/.rseq alongside the .rmdl
 #include "animconv_wrapper.h"
 
 // RUI mesh support
@@ -36,14 +36,14 @@
 #pragma warning(disable: 4996) // strcpy/sprintf safety
 #pragma warning(disable: 4244) // float/int conversions
 
-// studiomdl globals — cdtexture search paths set by $cdtexture in the QC.
+// studiomdl globals â€” cdtexture search paths set by $cdtexture in the QC.
 // Read directly from the global array instead of parsing the MDL binary to
 // avoid issues with the studiomdl string-table patching order.
 extern int    numcdtextures;
 extern char*  cdtextures[16];
 extern char   g_outname[MAX_PATH]; // e.g. "weapons\smr\w_smr.mdl"
 
-// Game content root — declared in utils_common/filesystem_tools.cpp.
+// Game content root â€” declared in utils_common/filesystem_tools.cpp.
 // rrig/rseq output is placed relative to this directory.
 extern char gamedir[1024];
 
@@ -77,12 +77,43 @@ extern char gamedir[1024];
 
 // Studiohdr flags we need
 #define R5_STUDIOHDR_FLAGS_STATIC_PROP       0x10
+#define R5_STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS 0x4000
 #define R5_STUDIOHDR_FLAGS_HAS_PHYSICS_DATA  0x40000
 #define R5_STUDIOHDR_FLAGS_USES_VERTEX_COLOR 0x1000000
 #define R5_STUDIOHDR_FLAGS_USES_UV2          0x2000000
 
 #define MAX_NUM_LODS_R5 8
+#define R5_MAX_BONES_PER_VERTEX 16
 #define RMDL_FILEBUF_SIZE (32 * 1024 * 1024)
+
+// The temporary Source VVD is ABI-limited to three weights. write.cpp emits
+// this sidecar before its VVD/VTX fixup pass; it is not an output asset.
+#define R5_WEIGHT_SIDECAR_MAGIC 0x54573552 // 'R5WT'
+#define R5_WEIGHT_SIDECAR_VERSION 1
+
+#pragma pack(push, 1)
+struct r5_weight_sidecar_header_t
+{
+    uint32_t magic;
+    uint32_t version;
+    uint32_t vertexCount;
+};
+
+struct r5_weight_sidecar_record_t
+{
+    uint8_t numbones;
+    uint8_t bone[R5_MAX_BONES_PER_VERTEX];
+    float weight[R5_MAX_BONES_PER_VERTEX];
+};
+
+struct r5_vg_ExtraBoneWeight_t
+{
+    int16_t weight;
+    int16_t bone;
+};
+#pragma pack(pop)
+static_assert(sizeof(r5_weight_sidecar_record_t) == 81, "Unexpected R5 sidecar layout");
+static_assert(sizeof(r5_vg_ExtraBoneWeight_t) == 4, "Unexpected VG extra weight layout");
 
 //-----------------------------------------------------------------------------
 // VVD structures (matches Valve VVD format exactly)
@@ -226,7 +257,7 @@ struct r5_vg_FileHeader_t
     int64_t  unused[8];
 };
 
-// VTX Strip header (matches OptimizedModel::StripHeader_t — must be #pragma pack(1) = 35 bytes)
+// VTX Strip header (matches OptimizedModel::StripHeader_t â€” must be #pragma pack(1) = 35 bytes)
 // Without packing, int32_t numBoneStateChanges would be padded to offset 20 instead of 19,
 // giving 36 bytes and corrupting every strip after index 0 in the VG file.
 #pragma pack(push, 1)
@@ -292,7 +323,7 @@ struct r5_mstudiojigglebone_t
     float   baseMinForward, baseMaxForward, baseForwardFriction;
 };
 
-// Attachment (RMDL v54 — no unused[8], 60 bytes total)
+// Attachment (RMDL v54 â€” no unused[8], 60 bytes total)
 struct r5_mstudioattachment_t
 {
     int         sznameindex;
@@ -309,7 +340,7 @@ struct r5_mstudiohitboxset_t
     int hitboxindex;
 };
 
-// Hitbox (RMDL v54/v8 — 44 bytes total; MDL v49 had unused[8] here = 32 extra bytes)
+// Hitbox (RMDL v54/v8 â€” 44 bytes total; MDL v49 had unused[8] here = 32 extra bytes)
 struct r5_mstudiobbox_t
 {
     int   bone;
@@ -413,7 +444,7 @@ struct r5_mstudioseqdesc_t
     int       unused[2];  // RMDL v54: 2 unused ints (208 bytes total); MDL v49 had unused[5] here = 12 bytes extra
 };
 
-// Anim descriptor (RMDL v54 — 52 bytes total, matches binary template mstudioanimdesc_t_v54)
+// Anim descriptor (RMDL v54 â€” 52 bytes total, matches binary template mstudioanimdesc_t_v54)
 struct r5_mstudioanimdesc_t
 {
     int   baseptr;
@@ -618,7 +649,7 @@ struct r5_mstudio_meshvertexdata_t
 
 // mstudiomesh_t on-disk size is exactly 92 bytes (matches engine r5::v8 layout with pack(4)).
 // The reference (rmdlconv studio.h) uses void* pUnknown with #pragma pack(push,4) to get 92
-// bytes on 64-bit. On Win32, void* is only 4 bytes, giving 88 bytes — wrong for the engine.
+// bytes on 64-bit. On Win32, void* is only 4 bytes, giving 88 bytes â€” wrong for the engine.
 // Using char pUnknown[8] is always 8 bytes on all platforms and requires no pack pragma.
 struct r5_mstudiomesh_t
 {
@@ -666,7 +697,7 @@ struct r5_stringentry_t
     char*       base;
     char*       addr;
     int*        ptr;
-    std::string string; // owning copy — prevents dangling when caller's std::string dies
+    std::string string; // owning copy â€” prevents dangling when caller's std::string dies
     int         dupindex; // -1 if unique
 };
 
@@ -676,7 +707,7 @@ static char* s_pData  = nullptr;
 static r5_studiohdr_t* s_pHdr = nullptr;
 static bool s_bZeroGuids    = false; // set by -vmtext flag
 static bool s_bConvertAnims = false; // set by -convertanims flag
-static bool s_bCdPick       = false; // set by -cdpick flag — interactive per-texture cdmaterials picker
+static bool s_bCdPick       = false; // set by -cdpick flag â€” interactive per-texture cdmaterials picker
 static std::string s_overrideRrigPath;  // set by -rp
 static std::string s_overrideRseqPath;  // set by -sp
 static std::string s_ruiMeshFilePath;   // set by $ruimeshfile QC command
@@ -894,32 +925,135 @@ struct r5_VGBuilder
     std::vector<uint16_t>           indices;
     std::vector<r5_vg_StripHeader_t> strips;
     std::vector<r5_mstudioboneweight_t> legacyWeights;
+    std::vector<r5_vg_ExtraBoneWeight_t> extraWeights;
     size_t  currentVertBufferSize;
     int64_t defaultFlags;
+    bool usesExtendedWeights;
 };
 
 //-----------------------------------------------------------------------------
-// Build bone state remapping from VVD
+// Resolve a vertex's complete source influence list. The optional sidecar is
+// emitted by this compiler and retains the influences that the legacy VVD
+// cannot represent.
 //-----------------------------------------------------------------------------
-static void R5_SetupBoneStates(r5_VGBuilder& b, const r5_vertexFileHeader_t* pVVD)
+struct r5_WeightSet_t
+{
+    int count;
+    uint8_t bone[R5_MAX_BONES_PER_VERTEX];
+    float weight[R5_MAX_BONES_PER_VERTEX];
+};
+
+static r5_WeightSet_t R5_GetWeightSet(const r5_vertexFileHeader_t* pVVD, int vertexIndex,
+    const std::vector<r5_weight_sidecar_record_t>& sidecarWeights)
+{
+    r5_WeightSet_t result{};
+    if ((size_t)vertexIndex < sidecarWeights.size())
+    {
+        const r5_weight_sidecar_record_t& source = sidecarWeights[vertexIndex];
+        result.count = (std::min)((int)source.numbones, R5_MAX_BONES_PER_VERTEX);
+        for (int i = 0; i < result.count; ++i)
+        {
+            result.bone[i] = source.bone[i];
+            result.weight[i] = source.weight[i];
+        }
+        return result;
+    }
+
+    const r5_mstudioboneweight_t& source = pVVD->GetVertexData(vertexIndex)->m_BoneWeights;
+    result.count = (std::min)((int)source.numbones, VVD_MAX_NUM_BONES_PER_VERT);
+    for (int i = 0; i < result.count; ++i)
+    {
+        result.bone[i] = (uint8_t)source.bone[i];
+        result.weight[i] = source.weight[i];
+    }
+    return result;
+}
+
+static bool R5_HasExtendedWeights(const std::vector<r5_weight_sidecar_record_t>& sidecarWeights)
+{
+    for (const r5_weight_sidecar_record_t& weight : sidecarWeights)
+    {
+        if (weight.numbones > VVD_MAX_NUM_BONES_PER_VERT)
+            return true;
+    }
+    return false;
+}
+
+static void R5_SetupBoneStates(r5_VGBuilder& b, const r5_vertexFileHeader_t* pVVD,
+    const std::vector<r5_weight_sidecar_record_t>& sidecarWeights)
 {
     b.boneMap.clear();
     b.boneStates.clear();
 
     for (int vi = 0; vi < pVVD->numLODVertexes[0]; vi++)
     {
-        const r5_mstudiovertex_t* vert = pVVD->GetVertexData(vi);
-        const r5_mstudioboneweight_t& bw = vert->m_BoneWeights;
-
-        for (int bi = 0; bi < bw.numbones && bi < 3; bi++)
+        const r5_WeightSet_t weights = R5_GetWeightSet(pVVD, vi, sidecarWeights);
+        for (int bi = 0; bi < weights.count; ++bi)
         {
-            uint8_t bone = (uint8_t)bw.bone[bi];
+            uint8_t bone = weights.bone[bi];
             if (!b.boneMap.count(bone))
             {
                 b.boneMap.insert({ bone, (uint8_t)b.boneStates.size() });
                 b.boneStates.push_back(bone);
             }
         }
+    }
+}
+
+static uint16_t R5_PackExtendedWeight(float value)
+{
+    value = (std::max)(0.0f, (std::min)(1.0f, value));
+    return (uint16_t)(std::max)(0L, (std::min)(32767L, lroundf(value * 32768.0f - 1.0f)));
+}
+
+static uint8_t R5_RemapBone(const r5_VGBuilder& b, uint8_t bone)
+{
+    std::map<uint8_t, uint8_t>::const_iterator it = b.boneMap.find(bone);
+    return it != b.boneMap.end() ? it->second : bone;
+}
+
+// The RMDL v54 extended layout stores the first influence inline, the final
+// influence implicitly as the remaining weight, and the middle influences in
+// the VG extra-weight stream. The packed extra-weight index is relative to
+// the current mesh's extra-weight block, not to the VG-wide array.
+static void R5_EncodeExtendedWeights(r5_VGBuilder& b, const r5_WeightSet_t& source,
+    uint16_t meshExtraWeightIndex, r5_vg_PackedWeights_t& packedWeights,
+    r5_vg_PackedBones_t& packedBones)
+{
+    r5_WeightSet_t weights = source;
+    if (weights.count <= 0)
+    {
+        weights.count = 1;
+        weights.bone[0] = 0;
+        weights.weight[0] = 1.0f;
+    }
+
+    float total = 0.0f;
+    for (int i = 0; i < weights.count; ++i)
+        total += (std::max)(0.0f, weights.weight[i]);
+    if (total <= 0.0f)
+    {
+        weights.count = 1;
+        weights.bone[0] = 0;
+        weights.weight[0] = 1.0f;
+        total = 1.0f;
+    }
+    for (int i = 0; i < weights.count; ++i)
+        weights.weight[i] = (std::max)(0.0f, weights.weight[i]) / total;
+
+    packedWeights.weight[0] = R5_PackExtendedWeight(weights.weight[0]);
+    packedWeights.weight[1] = meshExtraWeightIndex;
+    packedBones.bones[0] = R5_RemapBone(b, weights.bone[0]);
+    packedBones.bones[1] = R5_RemapBone(b, weights.bone[weights.count - 1]);
+    packedBones.bones[2] = 0;
+    packedBones.numbones = (uint8_t)(weights.count - 1);
+
+    for (int i = 1; i < weights.count - 1; ++i)
+    {
+        r5_vg_ExtraBoneWeight_t extra{};
+        extra.weight = (int16_t)R5_PackExtendedWeight(weights.weight[i]);
+        extra.bone = (int16_t)R5_RemapBone(b, weights.bone[i]);
+        b.extraWeights.push_back(extra);
     }
 }
 
@@ -994,7 +1128,8 @@ static void R5_GetVerticesForLOD(const r5_vertexFileHeader_t* pVVD, int lodLevel
 static bool R5_BuildVGData(r5_VGBuilder& b,
     const r5_studiohdr_t* pHdr,
     const OptimizedModel::FileHeader_t* pVTX,
-    const r5_vertexFileHeader_t* pVVD)
+    const r5_vertexFileHeader_t* pVVD,
+    const std::vector<r5_weight_sidecar_record_t>& sidecarWeights)
 {
     // Check model bounds to decide packed vs full position
     bool isLargeModel = false;
@@ -1019,7 +1154,9 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
 
     // Bone states
     if (pHdr->numbones > 2)
-        R5_SetupBoneStates(b, pVVD);
+        R5_SetupBoneStates(b, pVVD, sidecarWeights);
+
+    b.usesExtendedWeights = R5_HasExtendedWeights(sidecarWeights);
 
     b.hdr.boneStateChangeCount = (int64_t)b.boneStates.size();
     b.hdr.lodCount = pVTX->numLODs;
@@ -1073,7 +1210,7 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                     // Bone weight flags
                     if (pHdr->numbones > 1)
                     {
-                        newMesh.extraBoneWeightOffset = 0; // no extra weights for v49
+                        newMesh.extraBoneWeightOffset = (int32_t)(b.extraWeights.size() * sizeof(r5_vg_ExtraBoneWeight_t));
                         newMesh.legacyWeightOffset    = (int32_t)b.legacyWeights.size();
                         newMesh.flags |= VG_VERTEX_HAS_WEIGHT_BONES;
                         newMesh.flags |= VG_VERTEX_HAS_WEIGHT_VALUES_2;
@@ -1126,24 +1263,35 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
 
                             if (newMesh.flags & VG_VERTEX_HAS_WEIGHT_BONES)
                             {
-                                const r5_mstudioboneweight_t& bw = pVVDVert->m_BoneWeights;
-
-                                for (int bi = 0; bi < bw.numbones && bi < 3; bi++)
+                                const r5_WeightSet_t weights = R5_GetWeightSet(pVVD, vvdIdx, sidecarWeights);
+                                if (b.usesExtendedWeights)
                                 {
-                                    uint8_t bone = (uint8_t)bw.bone[bi];
-                                    uint8_t remapped = bone;
-                                    if (b.boneMap.count(bone))
-                                        remapped = b.boneMap[bone];
+                                    const size_t meshExtraWeightIndex = b.extraWeights.size() -
+                                        (size_t)newMesh.extraBoneWeightOffset / sizeof(r5_vg_ExtraBoneWeight_t);
+                                    Assert(meshExtraWeightIndex <= 0xffff);
+                                    R5_EncodeExtendedWeights(b, weights, (uint16_t)meshExtraWeightIndex,
+                                        hwVert.weights, hwVert.bones);
+                                }
+                                else
+                                {
+                                    for (int bi = 0; bi < weights.count; ++bi)
+                                    {
+                                        hwVert.bones.bones[bi] = R5_RemapBone(b, weights.bone[bi]);
+                                        if (bi < 2)
+                                            hwVert.weights.weight[bi] = (uint16_t)(weights.weight[bi] * 32767.0f);
+                                    }
 
-                                    hwVert.bones.bones[bi] = remapped;
-
-                                    if (bi < 2)
-                                        hwVert.weights.weight[bi] = (uint16_t)(bw.weight[bi] * 32767.0f);
+                                    hwVert.bones.numbones = (uint8_t)(weights.count > 0 ? weights.count - 1 : 0);
                                 }
 
-                                hwVert.bones.numbones = (uint8_t)(bw.numbones > 0 ? bw.numbones - 1 : 0);
-
-                                b.legacyWeights.push_back(bw);
+                                r5_mstudioboneweight_t legacy{};
+                                legacy.numbones = (char)(std::min)(weights.count, VVD_MAX_NUM_BONES_PER_VERT);
+                                for (int bi = 0; bi < legacy.numbones; ++bi)
+                                {
+                                    legacy.bone[bi] = (char)weights.bone[bi];
+                                    legacy.weight[bi] = weights.weight[bi];
+                                }
+                                b.legacyWeights.push_back(legacy);
                                 newMesh.legacyWeightCount++;
                             }
 
@@ -1162,6 +1310,8 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                     }
 
                     b.strips.push_back(hwStrip);
+
+                    newMesh.extraBoneWeightSize = (int32_t)(b.extraWeights.size() * sizeof(r5_vg_ExtraBoneWeight_t)) - newMesh.extraBoneWeightOffset;
 
                     if (newMesh.vertCount == 0)
                     {
@@ -1183,7 +1333,7 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                     //
                     // Fixup path: numLODVertexes[lodIdx] is the authoritative count of
                     // vertices this mesh contributes to lodVerts at the current LOD.
-                    // A value of 0 is legitimate — it means the mesh is fully stripped at
+                    // A value of 0 is legitimate â€” it means the mesh is fully stripped at
                     // this LOD and adds nothing to lodVerts, so the stride is 0.
                     // DO NOT fall back to pMdlMesh->numvertices here: that is the LOD-0
                     // count and using it for a stripped mesh inflates localVertOffset,
@@ -1194,12 +1344,12 @@ static bool R5_BuildVGData(r5_VGBuilder& b,
                     int meshVertCount;
                     if (pVVD->numFixups > 0)
                     {
-                        // Trust numLODVertexes directly — 0 means 0 contribution.
+                        // Trust numLODVertexes directly â€” 0 means 0 contribution.
                         meshVertCount = pMdlMesh->vertexloddata.numLODVertexes[lodIdx];
                     }
                     else
                     {
-                        // No fixups — always stride by the LOD-0 count.
+                        // No fixups â€” always stride by the LOD-0 count.
                         meshVertCount = pMdlMesh->numvertices;
                         if (meshVertCount == 0)
                             meshVertCount = pMdlMesh->vertexloddata.numLODVertexes[0];
@@ -1283,9 +1433,12 @@ static void R5_WriteVGFile(const char* path, r5_VGBuilder& b)
     }
     b.hdr.vertBufferSize = (int64_t)ftell(f) - b.hdr.vertOffset;
 
-    // Extra bone weights (none for v49 - no VVW)
+    // Extended RMDL v54 bone weights. Models without an influence above three
+    // retain the previous empty stream and legacy vertex encoding.
     b.hdr.extraBoneWeightOffset = (int64_t)ftell(f);
-    b.hdr.extraBoneWeightSize   = 0;
+    b.hdr.extraBoneWeightSize   = (int64_t)(b.extraWeights.size() * sizeof(r5_vg_ExtraBoneWeight_t));
+    if (!b.extraWeights.empty())
+        fwrite(b.extraWeights.data(), sizeof(r5_vg_ExtraBoneWeight_t), b.extraWeights.size(), f);
 
     // Unknown per-mesh data (0x30 bytes each, all zeros)
     size_t unkCount = (size_t)b.hdr.unknownCount;
@@ -1317,7 +1470,7 @@ static void R5_WriteVGFile(const char* path, r5_VGBuilder& b)
 }
 
 //=============================================================================
-// MDL v49 → RMDL v54 Conversion
+// MDL v49 â†’ RMDL v54 Conversion
 //=============================================================================
 
 #define RMDL_STRING_FROM_IDX(base, idx) ((const char*)(base) + (idx))
@@ -1787,7 +1940,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
 
     s_pHdr->textureindex = (int)(s_pData - s_pBase);
 
-    // Cache for -cdpick: maps bare texture name → user-chosen cdmaterials prefix.
+    // Cache for -cdpick: maps bare texture name â†’ user-chosen cdmaterials prefix.
     // Ensures identical texture names always get the same prefix, and we only ask once.
     std::map<std::string, std::string> cdPickCache;
 
@@ -1803,7 +1956,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
         std::string fullName;
         if (strchr(texName, '/') || strchr(texName, '\\'))
         {
-            // Already has a path — normalise slashes and use verbatim.
+            // Already has a path â€” normalise slashes and use verbatim.
             fullName = texName;
             for (char& c : fullName) if (c == '\\') c = '/';
         }
@@ -1845,7 +1998,7 @@ static void R5_ConvertTextures(const studiohdr_t* pOld)
         }
         else
         {
-            // No $cdmaterials at all — use the bare name exactly as it appears
+            // No $cdmaterials at all â€” use the bare name exactly as it appears
             // in the SMD (e.g. "smr", "smr_plate").
             fullName = texName;
         }
@@ -2045,6 +2198,36 @@ static std::string R5_ReplaceExt(const std::string& path, const char* newExt)
     return path.substr(0, dot) + newExt;
 }
 
+static bool R5_LoadWeightSidecar(const std::string& path, int expectedVertexCount,
+    std::vector<r5_weight_sidecar_record_t>& outRecords)
+{
+    size_t size = 0;
+    char* data = R5_LoadFile(path.c_str(), size);
+    if (!data)
+        return false;
+
+    bool valid = size >= sizeof(r5_weight_sidecar_header_t);
+    const r5_weight_sidecar_header_t* header = reinterpret_cast<const r5_weight_sidecar_header_t*>(data);
+    valid = valid && header->magic == R5_WEIGHT_SIDECAR_MAGIC &&
+        header->version == R5_WEIGHT_SIDECAR_VERSION &&
+        header->vertexCount == (uint32_t)expectedVertexCount &&
+        size >= sizeof(*header) + (size_t)header->vertexCount * sizeof(r5_weight_sidecar_record_t);
+
+    if (valid)
+    {
+        const r5_weight_sidecar_record_t* records =
+            reinterpret_cast<const r5_weight_sidecar_record_t*>(header + 1);
+        outRecords.assign(records, records + header->vertexCount);
+    }
+    else
+    {
+        printf("  [RMDL] WARNING: ignoring invalid extended-weight sidecar '%s'\n", path.c_str());
+    }
+
+    delete[] data;
+    return valid;
+}
+
 // Extract just the filename stem (no directory, no extension) from a full path.
 //   "C:\game\weapons\p2011\p2011.mdl" -> "p2011"
 static std::string R5_FileStem(const std::string& path)
@@ -2094,7 +2277,7 @@ static std::string R5_RelativeToGamedir(const std::string& mdlPath,
 }
 
 //-----------------------------------------------------------------------------
-// R5_RunAnimConv — convert the compiled MDL to .rrig/.rseq in-process.
+// R5_RunAnimConv â€” convert the compiled MDL to .rrig/.rseq in-process.
 // (Previously spawned R5-AnimConv.exe as a subprocess; now calls the
 //  embedded R5-AnimConv source directly via animconv_wrapper.h.)
 //-----------------------------------------------------------------------------
@@ -2108,29 +2291,63 @@ static void R5_RunAnimConv(const char* mdlFilePath)
                              /*verbose=*/false);
 }
 
+// Remove the temporary Source-format products once their data has been
+// converted. Animation-only QCs still produce a transient MDL for animconv,
+// but deliberately do not produce an RMDL or VG.
+static void R5_RemoveIntermediateModelFiles(const std::string& mdlPath)
+{
+    std::string stem = mdlPath;
+    const size_t dot = stem.rfind('.');
+    if (dot != std::string::npos)
+        stem = stem.substr(0, dot);
+
+    static const char* kTemporaryExtensions[] = {
+        ".mdl", ".vvd", ".r5weights", ".ani",
+        ".sw.vtx", ".dx80.vtx", ".dx90.vtx",
+        nullptr
+    };
+    for (int i = 0; kTemporaryExtensions[i]; ++i)
+        remove((stem + kTemporaryExtensions[i]).c_str());
+}
+
+static bool R5_HasRenderableMesh(const studiohdr_t* pHdr)
+{
+    for (int bodyPartIndex = 0; bodyPartIndex < pHdr->numbodyparts; ++bodyPartIndex)
+    {
+        const mstudiobodyparts_t* pBodyPart = pHdr->pBodypart(bodyPartIndex);
+        for (int modelIndex = 0; modelIndex < pBodyPart->nummodels; ++modelIndex)
+        {
+            const mstudiomodel_t* pModel = pBodyPart->pModel(modelIndex);
+            if (pModel->nummeshes > 0 && pModel->numvertices > 0)
+                return true;
+        }
+    }
+    return false;
+}
+
 //-----------------------------------------------------------------------------
 // R5_WriteRuiSection
 // Writes the ruiheader[] + ruimesh blob into the RMDL buffer and fills
 // s_pHdr->uiPanelCount / uiPanelOffset.
 //
 // Binary layout written per mesh
-// ┌─────────────────────────────────────────────────────┐
-// │ mstudioruimesh_t_v54   (28 bytes)                   │
-// │ char name[]            (null-terminated)            │
-// │ char padding[]         (to 16-byte-align vertices)  │
-// │ int16 parent[numparents]                            │
-// │ mstudioruivertmap_t[numfaces]    (6 bytes each)     │
-// │ mstudioruifourthvertv54_t[nf]    (2 bytes each)     │
-// │ mstudioruivert_t[numvertices]    (16 bytes each)    │
-// │ mstudioruimeshface_t[numfaces]   (32 bytes each)    │
-// └─────────────────────────────────────────────────────┘
+// â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+// â”‚ mstudioruimesh_t_v54   (28 bytes)                   â”‚
+// â”‚ char name[]            (null-terminated)            â”‚
+// â”‚ char padding[]         (to 16-byte-align vertices)  â”‚
+// â”‚ int16 parent[numparents]                            â”‚
+// â”‚ mstudioruivertmap_t[numfaces]    (6 bytes each)     â”‚
+// â”‚ mstudioruifourthvertv54_t[nf]    (2 bytes each)     â”‚
+// â”‚ mstudioruivert_t[numvertices]    (16 bytes each)    â”‚
+// â”‚ mstudioruimeshface_t[numfaces]   (32 bytes each)    â”‚
+// â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 //-----------------------------------------------------------------------------
 static void R5_WriteRuiSection(const RuiFile& ruiFile, const studiohdr_t* pOldHdr)
 {
     if (ruiFile.meshes.empty())
         return;
 
-    // Build bone-name → index map from the source MDL.
+    // Build bone-name â†’ index map from the source MDL.
     std::map<std::string, int> boneMap;
     for (int i = 0; i < pOldHdr->numbones; i++)
     {
@@ -2338,14 +2555,23 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     const char* spVal = CommandLine()->ParmValue("-sp", (const char*)nullptr);
     s_overrideRseqPath = spVal ? spVal : "";
 
+    std::string mdlPath(mdlFilePath);
+
     if (s_bConvertAnims)
         R5_RunAnimConv(mdlFilePath);
 
+    if (!R5_HasRenderableMesh(pInMemMDL))
+    {
+        printf("[RMDL] Animation-only QC: skipping RMDL/VG output.\n");
+        R5_RemoveIntermediateModelFiles(mdlPath);
+        return;
+    }
+
     printf("\n[RMDL] Writing v10...\n");
 
-    std::string mdlPath(mdlFilePath);
     std::string vvdPath  = R5_ReplaceExt(mdlPath, ".vvd");
     std::string vtxPath  = R5_ReplaceExt(mdlPath, ".dx90.vtx");
+    std::string weightPath = R5_ReplaceExt(mdlPath, ".r5weights");
 
     // All output goes into gamedir\compiled\<modelname_path>\:
     //   gamedir\compiled\weapons\smr\w_smr.rmdl
@@ -2379,7 +2605,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     const std::string phySrc   = gamedirStr + "models\\" + relStem + ".phy";
     const std::string phyDst   = compiledDir + relStem + ".phy";
 
-    // MDL is already in memory — no disk read needed.
+    // MDL is already in memory â€” no disk read needed.
     const studiohdr_t* pOldHdr = pInMemMDL;
 
     // VVD and VTX must be read from disk: they are finalized by studiomdl's
@@ -2406,6 +2632,10 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     const r5_vertexFileHeader_t* pVVD = reinterpret_cast<const r5_vertexFileHeader_t*>(vvdBuf);
     const OptimizedModel::FileHeader_t* pVTX =
         reinterpret_cast<const OptimizedModel::FileHeader_t*>(vtxBuf);
+
+    std::vector<r5_weight_sidecar_record_t> sidecarWeights;
+    R5_LoadWeightSidecar(weightPath, pVVD->numLODVertexes[0], sidecarWeights);
+    const bool hasExtendedWeights = R5_HasExtendedWeights(sidecarWeights);
 
     // Allocate output buffer
     s_pBase = new char[RMDL_FILEBUF_SIZE]();
@@ -2435,6 +2665,8 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     s_pHdr->view_bbmax   = pOldHdr->view_bbmax;
 
     s_pHdr->flags          = pOldHdr->flags;
+    if (hasExtendedWeights)
+        s_pHdr->flags |= R5_STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS;
     s_pHdr->numbones       = pOldHdr->numbones;
     s_pHdr->numhitboxsets  = pOldHdr->numhitboxsets;
     s_pHdr->numlocalseq    = 0; // set later
@@ -2493,7 +2725,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     R5_ConvertPoseParams(pOldHdr);
     R5_ConvertIKChains(pOldHdr);
 
-    // RUI mesh section (optional — only written when $ruimeshfile is set).
+    // RUI mesh section (optional â€” only written when $ruimeshfile is set).
     if (!s_ruiMeshFilePath.empty())
     {
         RuiFile ruiFile;
@@ -2558,7 +2790,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     }
 
     //-----------------------------------------------------------------------
-    // Write .rson file (RMDL → RRIG linkage)
+    // Write .rson file (RMDL â†’ RRIG linkage)
     // Only generated when -convertanims produced a .rrig.
     // Format: LF line endings, TAB-indented paths with backslashes.
     //-----------------------------------------------------------------------
@@ -2608,7 +2840,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
         vgBuilder.currentVertBufferSize = 0;
         vgBuilder.defaultFlags = 0;
 
-        bool ok = R5_BuildVGData(vgBuilder, s_pHdr, pVTX, pVVD);
+        bool ok = R5_BuildVGData(vgBuilder, s_pHdr, pVTX, pVVD, sidecarWeights);
         if (ok)
         {
             R5_WriteVGFile(vgPath.c_str(), vgBuilder);
@@ -2633,7 +2865,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     s_stringTable.clear();
 
     //-----------------------------------------------------------------------
-    // Convert studiomdl .phy → Apex relocatable-blob PHY format.
+    // Convert studiomdl .phy â†’ Apex relocatable-blob PHY format.
     //
     // Source Engine produces IVP compact-surface collision data which is
     // incompatible with Apex's native physics geometry format.  We
@@ -2646,10 +2878,10 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
     //   [key-value text]       Source-style physics properties
     //
     // Blob layout (all offsets relative to blob start):
-    //   BlobHeader (32 B)  →  Solid[] (144 B each)  →  Convex[] (64 B each)
-    //   →  vertex data (float[3] per vert)
-    //   →  face data   (32 B per face, byte vertex indices, 0xFF pad)
-    //   →  edge data   (4 B per edge: u8 v0, u8 v1, u8 faceA, u8 faceB)
+    //   BlobHeader (32 B)  â†’  Solid[] (144 B each)  â†’  Convex[] (64 B each)
+    //   â†’  vertex data (float[3] per vert)
+    //   â†’  face data   (32 B per face, byte vertex indices, 0xFF pad)
+    //   â†’  edge data   (4 B per edge: u8 v0, u8 v1, u8 faceA, u8 faceB)
     //-----------------------------------------------------------------------
     {
         extern IPhysicsCollision *physcollision;
@@ -2769,7 +3001,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
                             cd.faces.push_back(std::move(faceVerts));
                         }
 
-                        // --- Edges → {v0, v1, faceA, faceB} ---
+                        // --- Edges â†’ {v0, v1, faceA, faceB} ---
                         // Build edge-to-face map: each line is shared by 2 faces.
                         std::vector<uint8_t> lineFaceA(poly->iLineCount, 0xFF);
                         std::vector<uint8_t> lineFaceB(poly->iLineCount, 0xFF);
@@ -2822,7 +3054,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
 
                 // ---------------------------------------------------------------
                 // Build the relocatable blob.
-                // Layout: BlobHeader → Solid[] → Convex[] → vertex/face/edge data
+                // Layout: BlobHeader â†’ Solid[] â†’ Convex[] â†’ vertex/face/edge data
                 // ---------------------------------------------------------------
                 const int BLOB_HDR  = 32;
                 const int SOLID_SZ  = 144;
@@ -2973,7 +3205,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
                 // ---------------------------------------------------------------
                 struct IVPSHeader {
                     int size;            // 20
-                    int id;              // >= 1 → relocatable blob path
+                    int id;              // >= 1 â†’ relocatable blob path
                     int solidCount;
                     int checkSum;
                     int keyValuesOffset; // from file start
@@ -2996,7 +3228,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
 
                     // Patch the already-written RMDL header on disk:
                     // set phySize so the mod loader knows to load the .phy file.
-                    // Note: do NOT set STUDIOHDR_FLAGS_HAS_PHYSICS_DATA (0x40000) —
+                    // Note: do NOT set STUDIOHDR_FLAGS_HAS_PHYSICS_DATA (0x40000) â€”
                     // that flag is for pak-embedded physics only. For separate .phy
                     // files, phySize > 0 is sufficient (verified against reference
                     // models like slumcity_fencewall which have phySize set but no
@@ -3040,22 +3272,9 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
 
     //-----------------------------------------------------------------------
     // Remove all intermediate files studiomdl writes (MDL, VVD, all VTX
-    // variants, ANI) — RMDL + VG are the only outputs we keep.
+    // variants, ANI) â€” RMDL + VG are the only outputs we keep.
     //-----------------------------------------------------------------------
-    {
-        // Build stem (path without any extension) to derive all variants.
-        std::string stem_ = mdlPath;
-        size_t dot_ = stem_.rfind('.');
-        if (dot_ != std::string::npos) stem_ = stem_.substr(0, dot_);
-
-        static const char* kTmpExts[] = {
-            ".mdl", ".vvd", ".ani",
-            ".sw.vtx", ".dx80.vtx", ".dx90.vtx",
-            nullptr
-        };
-        for (int ei = 0; kTmpExts[ei]; ei++)
-            remove((stem_ + kTmpExts[ei]).c_str());
-    }
+    R5_RemoveIntermediateModelFiles(mdlPath);
 
     //-----------------------------------------------------------------------
     // Remove the now-empty gamedir\models\ directory tree
@@ -3073,7 +3292,7 @@ void WriteRMDLFiles(const studiohdr_t* pInMemMDL, const char* mdlFilePath)
                _strnicmp(cleanDir.c_str(), gamedirStr.c_str(), gamedirStr.size()) == 0)
         {
             if (!RemoveDirectoryA(cleanDir.c_str()))
-                break;  // directory not empty or already gone — stop
+                break;  // directory not empty or already gone â€” stop
             size_t slash = cleanDir.find_last_of("\\/");
             if (slash == std::string::npos) break;
             cleanDir = cleanDir.substr(0, slash);

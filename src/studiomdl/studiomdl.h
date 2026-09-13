@@ -1,4 +1,4 @@
-//===== Copyright © 1996-2008, Valve Corporation, All rights reserved. ======//
+//===== Copyright Â© 1996-2008, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: 
 //
@@ -59,7 +59,10 @@ class CDmeCombinationOperator;
 #define MAXSTUDIOEVENTS			1024
 #define MAXSTUDIOFLEXKEYS		512
 #define MAXSTUDIOFLEXRULES		1024
-#define MAXSTUDIOBONEWEIGHTS	3
+// RMDL v54 can carry up to 16 influences through its extended-weight stream.
+// Keep the Source-format MAX_NUM_BONES_PER_VERT at 3; that is the layout of
+// the temporary VVD/VTX files generated on the way to the RMDL conversion.
+#define MAXSTUDIOBONEWEIGHTS	16
 #define MAXSTUDIOCMDS			64
 #define MAXSTUDIOMOVEKEYS		64
 #define MAXSTUDIOIKRULES		64
@@ -177,6 +180,28 @@ struct s_boneweight_t
 	int		bone[MAXSTUDIOBONEWEIGHTS];
 	float	weight[MAXSTUDIOBONEWEIGHTS];
 };
+
+// Sidecar used only between the Source-compatible studiomdl pass and the RMDL
+// writer. It preserves all source influences while the temporary VVD/VTX
+// files retain their fixed, three-influence ABI.
+#define R5_WEIGHT_SIDECAR_MAGIC 0x54573552 // 'R5WT'
+#define R5_WEIGHT_SIDECAR_VERSION 1
+
+#pragma pack(push, 1)
+struct r5_weight_sidecar_header_t
+{
+	uint32	magic;
+	uint32	version;
+	uint32	vertexCount;
+};
+
+struct r5_weight_sidecar_record_t
+{
+	uint8	numbones;
+	uint8	bone[MAXSTUDIOBONEWEIGHTS];
+	float	weight[MAXSTUDIOBONEWEIGHTS];
+};
+#pragma pack(pop)
 
 struct s_tmpface_t
 {
@@ -944,7 +969,8 @@ EXTERN  int g_skinref[256][MAXSTUDIOSKINS]; // [skin][skinref], returns texture 
 EXTERN	int g_numtexturegroups;
 EXTERN	int g_numtexturelayers[32];
 EXTERN	int g_numtexturereps[32];
-EXTERN  int g_texturegroup[32][32][32];
+// [texture group][skin family][material slot]
+EXTERN  int g_texturegroup[32][32][MAXSTUDIOSKINS];
 
 struct s_mesh_t
 {

@@ -73,7 +73,11 @@ struct studiohdr_t;
 #define MAXSTUDIOVERTS		65536	// TODO: tune this
 #define	MAXSTUDIOFLEXVERTS	10000	// max number of verts that can be flexed per mesh.  TODO: tune this
 #endif
-#define MAXSTUDIOSKINS		32		// total textures
+// Apex RMDL meshes use integer material references rather than the legacy
+// 32-entry Source skin table. Keep the compiler-side tables large enough for
+// 64 distinct materials/skins while retaining the existing layout everywhere
+// that consumes MAXSTUDIOSKINS.
+#define MAXSTUDIOSKINS		64		// total textures / compiler material slots
 #define MAXSTUDIOBONES		256		// total bones actually used
 #define MAXSTUDIOFLEXDESC	1024	// maximum number of low level flexes (actual morph targets)
 #define MAXSTUDIOFLEXCTRL	96		// maximum number of flexcontrollers (input sliders)

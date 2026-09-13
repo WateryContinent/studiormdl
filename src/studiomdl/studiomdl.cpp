@@ -11993,9 +11993,51 @@ bool CStudioMDLApp::ParseArguments()
 	g_collapse_bones_message = false;
 
 	int argc = CommandLine()->ParmCount();
-	int i;
-	for ( i = 1; i < argc - 1; i++ ) 
+	int sourceArgIndex = -1;
+
+	// The historical parser assumed the QC was the last argument. That breaks
+	// normal option ordering such as "model.qc -convertanims -rp ... -sp ...".
+	// Prefer an explicit .qc path; also support the extensionless QC form when
+	// the corresponding file exists. Option values are never selected unless
+	// they themselves resolve to a QC file.
+	for ( int argIndex = 1; argIndex < argc; ++argIndex )
 	{
+		const char *candidate = CommandLine()->GetParm( argIndex );
+		if ( !candidate || candidate[0] == '-' )
+			continue;
+
+		const char *extension = Q_GetFileExtension( candidate );
+		if ( extension && !Q_stricmp( extension, "qc" ) )
+		{
+			sourceArgIndex = argIndex;
+			break;
+		}
+
+		if ( !extension )
+		{
+			char candidateQCPath[MAX_PATH];
+			Q_strncpy( candidateQCPath, candidate, sizeof( candidateQCPath ) );
+			Q_DefaultExtension( candidateQCPath, ".qc", sizeof( candidateQCPath ) );
+			if ( GetFileAttributesA( candidateQCPath ) != INVALID_FILE_ATTRIBUTES )
+			{
+				sourceArgIndex = argIndex;
+				break;
+			}
+		}
+	}
+
+	if ( sourceArgIndex < 0 )
+	{
+		UsageAndExit();
+		return false;
+	}
+
+	int i;
+	for ( i = 1; i < argc; i++ )
+	{
+		if ( i == sourceArgIndex )
+			continue;
+
 		const char *pArgv = CommandLine()->GetParm( i );
 		if ( pArgv[0] != '-' ) 
 			continue;
@@ -12223,15 +12265,7 @@ bool CStudioMDLApp::ParseArguments()
 		}
 	}	
 
-	if ( i >= argc )
-	{
-		// misformed arguments
-		// otherwise generating unintended results
-		UsageAndExit();
-		return false;
-	}
-	
-	const char *pArgv = CommandLine()->GetParm( i );
+	const char *pArgv = CommandLine()->GetParm( sourceArgIndex );
 	Q_strncpy( g_path, pArgv, sizeof(g_path) );
 
 	// Add .qc extension if missing so the file-exists check works

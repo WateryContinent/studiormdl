@@ -6,3 +6,4 @@ build_output.txt
 /src/studiomdl/build
 *.py
 /src/lib
+/src/studiomdl/bin

@@ -55,7 +55,7 @@
     <PreLinkEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</PreLinkEventUseInBuild>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</GenerateManifest>
-    <PostBuildEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</PostBuildEventUseInBuild>
+    <PostBuildEventUseInBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</PostBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -190,6 +190,28 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <OutputFile>$(OutDir)/studiormdl.bsc</OutputFile>
     </Bscmake>
+    <PostBuildEvent>
+      <Command>set &quot;ROOT=$(ProjectDir)..\..&quot;
+set &quot;OUT=%ROOT%\bin&quot;
+set &quot;PREBUILT=%ROOT%\src\prebuilt&quot;
+echo Collecting build output to: %OUT%
+if not exist &quot;%OUT%&quot; mkdir &quot;%OUT%&quot;
+copy /Y &quot;$(TargetPath)&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\tier0\$(Configuration)\tier0.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\vstdlib\$(Configuration)\vstdlib.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\filesystem_stdio\$(Configuration)\filesystem_stdio.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\materialsystem\$(Configuration)\materialsystem.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\studiorender\$(Configuration)\studiorender.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\mdllib\$(Configuration)\mdllib.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+copy /Y &quot;%ROOT%\build\shaderapiempty\$(Configuration)\shaderapiempty.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+if exist &quot;%PREBUILT%\vphysics.dll&quot; (
+  copy /Y &quot;%PREBUILT%\vphysics.dll&quot; &quot;%OUT%\&quot; || exit /b 1
+) else (
+  echo WARNING: src\prebuilt\vphysics.dll not found - physics collision will not work.
+)
+echo Done! Files in %OUT%:
+dir /B &quot;%OUT%&quot;</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Library Include="..\lib\public\appframework.lib" />

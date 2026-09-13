@@ -1,4 +1,4 @@
-//===== Copyright � 1996-2008, Valve Corporation, All rights reserved. ======//
+//===== Copyright ï¿½ 1996-2008, Valve Corporation, All rights reserved. ======//
 //
 // Purpose: 
 //
@@ -2342,12 +2342,17 @@ static void WriteBoneFlexDrivers( studiohdr2_t *pStudioHdr2 )
 static void WriteVertices( studiohdr_t *phdr )
 {
 	char			fileName[MAX_PATH];
+	char			weightFileName[MAX_PATH];
 	byte			*pStart;
 	byte			*pData;
 	int				i;
 	int				j;
 	int				k;
 	int				cur;
+	int				weightVertexCount = 0;
+	int				weightVertexIndex = 0;
+	r5_weight_sidecar_header_t *pWeightHeader = NULL;
+	r5_weight_sidecar_record_t *pWeightRecords = NULL;
 	bool			bExtraData = (phdr->flags & STUDIOHDR_FLAGS_EXTRA_VERTEX_DATA) != 0;
 
 	if (!g_nummodelsbeforeLOD)
@@ -2364,6 +2369,22 @@ static void WriteVertices( studiohdr_t *phdr )
 	strcat( fileName, g_outname );
 	Q_StripExtension( fileName, fileName, sizeof( fileName ) );
 	strcat( fileName, ".vvd" );
+	Q_StripExtension( fileName, weightFileName, sizeof( weightFileName ) );
+	strcat( weightFileName, ".r5weights" );
+
+	for ( i = 0; i < g_nummodelsbeforeLOD; ++i )
+	{
+		s_loddata_t *pLodData = g_model[i]->m_pLodData;
+		if ( pLodData )
+			weightVertexCount += pLodData->numvertices;
+	}
+
+	pWeightHeader = (r5_weight_sidecar_header_t *)calloc( 1,
+		sizeof( r5_weight_sidecar_header_t ) + weightVertexCount * sizeof( r5_weight_sidecar_record_t ) );
+	pWeightHeader->magic = R5_WEIGHT_SIDECAR_MAGIC;
+	pWeightHeader->version = R5_WEIGHT_SIDECAR_VERSION;
+	pWeightHeader->vertexCount = weightVertexCount;
+	pWeightRecords = (r5_weight_sidecar_record_t *)( pWeightHeader + 1 );
 
 	pStart = (byte *)kalloc( 1, FILEBUFFER );
 	pData  = pStart;
@@ -2412,11 +2433,42 @@ static void WriteVertices( studiohdr_t *phdr )
 
 			mstudioboneweight_t *pBoneWeight = &pVert[j].m_BoneWeights;
 			memset( pBoneWeight, 0, sizeof( mstudioboneweight_t ) );
-			pBoneWeight->numbones = lodVertex.boneweight.numbones;
+			// The temporary Source VVD ABI stores only three influences. The
+			// complete source set is written to the R5 sidecar below and consumed
+			// by rmdl_write.cpp after the VVD/VTX fixup pass has completed.
+			const int sourceBoneCount = MIN( lodVertex.boneweight.numbones, MAXSTUDIOBONEWEIGHTS );
+			pBoneWeight->numbones = MIN( sourceBoneCount, MAX_NUM_BONES_PER_VERT );
+			float sourceWeightTotal = 0.0f;
+			for ( k = 0; k < sourceBoneCount; ++k )
+			{
+				// Apex accepts normalized non-negative weights. Clamp malformed
+				// negative input here, then normalize the complete retained set.
+				sourceWeightTotal += MAX( 0.0f, lodVertex.boneweight.weight[k] );
+			}
+			float legacyWeightTotal = 0.0f;
+			for ( k = 0; k < pBoneWeight->numbones; ++k )
+			{
+				legacyWeightTotal += MAX( 0.0f, lodVertex.boneweight.weight[k] );
+			}
 			for (k = 0; k < pBoneWeight->numbones; k++)
 			{
 				pBoneWeight->bone[k]   = lodVertex.boneweight.bone[k];
-				pBoneWeight->weight[k] = lodVertex.boneweight.weight[k];
+				// The VTX optimizer can see only these three influences. Normalize
+				// them independently so it never diagnoses intentionally omitted
+				// extended influences as an invalid vertex.
+				pBoneWeight->weight[k] = legacyWeightTotal > 0.0f
+					? MAX( 0.0f, lodVertex.boneweight.weight[k] ) / legacyWeightTotal
+					: ( k == 0 ? 1.0f : 0.0f );
+			}
+
+			r5_weight_sidecar_record_t &weightRecord = pWeightRecords[weightVertexIndex++];
+			weightRecord.numbones = sourceBoneCount;
+			for ( k = 0; k < weightRecord.numbones; ++k )
+			{
+				weightRecord.bone[k] = (uint8)lodVertex.boneweight.bone[k];
+				weightRecord.weight[k] = sourceWeightTotal > 0.0f
+					? MAX( 0.0f, lodVertex.boneweight.weight[k] ) / sourceWeightTotal
+					: ( k == 0 ? 1.0f : 0.0f );
 			}
 		}
 
@@ -2506,6 +2558,10 @@ static void WriteVertices( studiohdr_t *phdr )
 		CP4AutoEditAddFile autop4( fileName );
 		SaveFile( fileName, pStart, pData - pStart );
 	}
+	Assert( weightVertexIndex == weightVertexCount );
+	SaveFile( weightFileName, pWeightHeader,
+		sizeof( r5_weight_sidecar_header_t ) + weightVertexCount * sizeof( r5_weight_sidecar_record_t ) );
+	free( pWeightHeader );
 }
 
 
@@ -4196,7 +4252,7 @@ bool BuildSortedVertexList(const studiohdr_t *pStudioHdr, const void *pVtxBuff, 
 // VVD files get vertexes remapped to a flat lod sorted order.
 //-----------------------------------------------------------------------------
 bool FixupVVDFile(const char *fileName,  const studiohdr_t *pStudioHdr, const void *pVtxBuff, const vertexPool_t *pVertexPools, int numVertexPools, const usedVertex_t *pVertexList, int numVertexes)
-{	
+{
 	OptimizedModel::FileHeader_t	*pVtxHdr;
 	vertexFileHeader_t				*pFileHdr_old;
 	vertexFileHeader_t				*pFileHdr_new;
@@ -4222,6 +4278,13 @@ bool FixupVVDFile(const char *fileName,  const studiohdr_t *pStudioHdr, const vo
 	byte							*pExtraDataBase_old = NULL;
 	byte							*pExtraDataBase_new = NULL;
 	void							*pVvdBuff;
+	void							*pWeightBuff = NULL;
+	r5_weight_sidecar_header_t		*pWeightHeader_old = NULL;
+	r5_weight_sidecar_header_t		*pWeightHeader_new = NULL;
+	r5_weight_sidecar_record_t		*pWeightRecords_old = NULL;
+	r5_weight_sidecar_record_t		*pWeightRecords_new = NULL;
+	char						weightFileName[MAX_PATH];
+	int							weightFileLength = 0;
 	int								i;
 	int								j;
 	int								k;
@@ -4243,6 +4306,34 @@ bool FixupVVDFile(const char *fileName,  const studiohdr_t *pStudioHdr, const vo
 	pVtxHdr = (OptimizedModel::FileHeader_t*)pVtxBuff; 
 
 	LoadFile((char*)fileName, &pVvdBuff);
+	Q_StripExtension( fileName, weightFileName, sizeof( weightFileName ) );
+	strcat( weightFileName, ".r5weights" );
+	if ( FileExists( weightFileName ) )
+	{
+		weightFileLength = LoadFile( weightFileName, &pWeightBuff );
+		pWeightHeader_old = (r5_weight_sidecar_header_t *)pWeightBuff;
+		if ( weightFileLength < (int)sizeof( *pWeightHeader_old ) ||
+			pWeightHeader_old->magic != R5_WEIGHT_SIDECAR_MAGIC ||
+			pWeightHeader_old->version != R5_WEIGHT_SIDECAR_VERSION ||
+			pWeightHeader_old->vertexCount != (uint32)numVertexes ||
+			weightFileLength < (int)( sizeof( *pWeightHeader_old ) + pWeightHeader_old->vertexCount * sizeof( r5_weight_sidecar_record_t ) ) )
+		{
+			MdlWarning( "Ignoring invalid R5 weight sidecar '%s'\n", weightFileName );
+			free( pWeightBuff );
+			pWeightBuff = NULL;
+			pWeightHeader_old = NULL;
+		}
+		else
+		{
+			pWeightRecords_old = (r5_weight_sidecar_record_t *)( pWeightHeader_old + 1 );
+			pWeightHeader_new = (r5_weight_sidecar_header_t *)calloc( 1,
+				sizeof( *pWeightHeader_new ) + numVertexes * sizeof( r5_weight_sidecar_record_t ) );
+			pWeightHeader_new->magic = R5_WEIGHT_SIDECAR_MAGIC;
+			pWeightHeader_new->version = R5_WEIGHT_SIDECAR_VERSION;
+			pWeightHeader_new->vertexCount = numVertexes;
+			pWeightRecords_new = (r5_weight_sidecar_record_t *)( pWeightHeader_new + 1 );
+		}
+	}
 
 	pFileHdr_old = (vertexFileHeader_t*)pVvdBuff;
 	if (pFileHdr_old->numLODs != 1)
@@ -4455,6 +4546,11 @@ bool FixupVVDFile(const char *fileName,  const studiohdr_t *pStudioHdr, const vo
 		
 		memcpy(&pVertex_new[i], pFlatVertexes[oldIndex], sizeof(mstudiovertex_t));
 		memcpy(&pTangent_new[i], pFlatTangents[oldIndex], sizeof(Vector4D));
+		if ( pWeightRecords_new )
+		{
+			const int sourceWeightIndex = (int)( pFlatVertexes[oldIndex] - (mstudiovertex_t *)pVertexBase_old );
+			memcpy( &pWeightRecords_new[i], &pWeightRecords_old[sourceWeightIndex], sizeof( r5_weight_sidecar_record_t ) );
+		}
 
 		if ( bExtraData )
 		{
@@ -4473,6 +4569,14 @@ bool FixupVVDFile(const char *fileName,  const studiohdr_t *pStudioHdr, const vo
 		CP4AutoEditAddFile autop4( fileName );
 		SaveFile((char*)fileName, pStart_new, pData_new-pStart_new);
 	}
+	if ( pWeightHeader_new )
+	{
+		SaveFile( weightFileName, pWeightHeader_new,
+			sizeof( *pWeightHeader_new ) + pWeightHeader_new->vertexCount * sizeof( r5_weight_sidecar_record_t ) );
+		free( pWeightHeader_new );
+	}
+	if ( pWeightBuff )
+		free( pWeightBuff );
 
 	free(pStart_base);
 	free(pFlatVertexes);
@@ -4888,6 +4992,11 @@ bool Clamp_MDL_LODS( const char *fileName, int rootLOD )
 bool Clamp_VVD_LODS( const char *fileName, int rootLOD, bool bExtraData )
 {
 	vertexFileHeader_t *pTempVvdHdr;
+	r5_weight_sidecar_header_t *pWeightHeader = NULL;
+	r5_weight_sidecar_header_t *pNewWeightHeader = NULL;
+	r5_weight_sidecar_record_t *pWeightRecords = NULL;
+	r5_weight_sidecar_record_t *pNewWeightRecords = NULL;
+	char weightFileName[MAX_PATH];
 	int			len;
 
 	len  = LoadFile((char*)fileName, (void **)&pTempVvdHdr);
@@ -4906,6 +5015,53 @@ bool Clamp_VVD_LODS( const char *fileName, int rootLOD, bool bExtraData )
 		CP4AutoEditAddFile autop4( fileName );
 		SaveFile( (char *)fileName, pNewVvdHdr, newLength );
 	}
+
+	// Mirror Studio_LoadVertexes for the extended-weight sidecar. The regular
+	// VVD keeps only three influences, so this is what keeps the full R5 set in
+	// the same vertex order after a non-zero root LOD is selected.
+	Q_StripExtension( fileName, weightFileName, sizeof( weightFileName ) );
+	strcat( weightFileName, ".r5weights" );
+	if ( FileExists( weightFileName ) &&
+		LoadFile( weightFileName, (void **)&pWeightHeader ) >= (int)sizeof( *pWeightHeader ) &&
+		pWeightHeader->magic == R5_WEIGHT_SIDECAR_MAGIC &&
+		pWeightHeader->version == R5_WEIGHT_SIDECAR_VERSION &&
+		pWeightHeader->vertexCount == (uint32)pTempVvdHdr->numLODVertexes[0] )
+	{
+		const int newVertexCount = pTempVvdHdr->numLODVertexes[rootLOD];
+		pWeightRecords = (r5_weight_sidecar_record_t *)( pWeightHeader + 1 );
+		pNewWeightHeader = (r5_weight_sidecar_header_t *)calloc( 1,
+			sizeof( *pNewWeightHeader ) + newVertexCount * sizeof( r5_weight_sidecar_record_t ) );
+		pNewWeightHeader->magic = R5_WEIGHT_SIDECAR_MAGIC;
+		pNewWeightHeader->version = R5_WEIGHT_SIDECAR_VERSION;
+		pNewWeightHeader->vertexCount = newVertexCount;
+		pNewWeightRecords = (r5_weight_sidecar_record_t *)( pNewWeightHeader + 1 );
+
+		if ( !pTempVvdHdr->numFixups )
+		{
+			memcpy( pNewWeightRecords, pWeightRecords,
+				newVertexCount * sizeof( r5_weight_sidecar_record_t ) );
+		}
+		else
+		{
+			int target = 0;
+			vertexFileFixup_t *pFixups = (vertexFileFixup_t *)( (byte *)pTempVvdHdr + pTempVvdHdr->fixupTableStart );
+			for ( int i = 0; i < pTempVvdHdr->numFixups; ++i )
+			{
+				if ( pFixups[i].lod < rootLOD )
+					continue;
+				memcpy( pNewWeightRecords + target, pWeightRecords + pFixups[i].sourceVertexID,
+					pFixups[i].numVertexes * sizeof( r5_weight_sidecar_record_t ) );
+				target += pFixups[i].numVertexes;
+			}
+			Assert( target == newVertexCount );
+		}
+
+		SaveFile( weightFileName, pNewWeightHeader,
+			sizeof( *pNewWeightHeader ) + newVertexCount * sizeof( r5_weight_sidecar_record_t ) );
+		free( pNewWeightHeader );
+	}
+	if ( pWeightHeader )
+		free( pWeightHeader );
 
 	return true;
 }
