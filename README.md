@@ -3,7 +3,7 @@
 </div>
 <div align="center">
   <h1><b>StudioRMDL</b></h1>
-  <p><i>A model compiler for Apex Legends Season 3 Models (RMDL v54 subversion 10) for <a href="https://discord.gg/wVsudEruAx">R5Valkyrie</a>.</i></p>
+  <p><i>A model compiler for Apex Legends Season 3 Models (RMDL v54 subversion 10) for <a href="https://discord.gg/wdSnqaFs">Project Afterburn</a>.</i></p>
 </div>
 
 > [!WARNING]
